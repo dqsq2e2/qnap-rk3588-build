@@ -1,0 +1,7 @@
+qnap-firmware/**
+qnap-kernel/**
+boards/*/build-out/
+*.zip
+*.img
+build_logs/
+qnap-tools/tmp/

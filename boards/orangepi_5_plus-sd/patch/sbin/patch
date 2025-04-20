@@ -1,0 +1,39 @@
+#!/bin/sh
+patch_front()
+{
+	[ ! -f /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko 2>>/dev/null
+	sed "/i915.ko/i \[ ! -f /lib/modules/misc/gpu-sched.ko \] || /sbin/insmod /lib/modules/misc/gpu-sched.ko" /etc/init.d/init_check.sh -i
+	sed "/i915.ko/i \[ ! -f /lib/modules/misc/panfrost.ko \] || /sbin/insmod /lib/modules/misc/panfrost.ko" /etc/init.d/init_check.sh -i
+	sed "/hal_netlink.ko/i if \[ x\$(fw_printenv -n qnap_kernel) != x\"qnap\" \] && [ \$(fw_printenv -n qnap_kernel_version) -lt 521 ]; then cp -f /lib/modules/misc/hal_netlink.bak /lib/modules/misc/hal_netlink.ko ; fi" /etc/init.d/init_check.sh -i
+	if [ x$(fw_printenv -n qnap_kernel) = x"qnap" ]; then /sbin/insmod /lib/modules/misc/pwm-fan.ko; sed '/^SIO_HWMON_INDEX[[:space:]]*=/c\SIO_HWMON_INDEX = 7'  -i  /etc/model.conf; fi 2>>/dev/null
+	#echo schedutil | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+	#fix model MEMORY_SIZE_M
+	Total=$(cat /proc/meminfo |grep 'MemTotal' |awk -F : '{print $2}' |sed 's/^[ \t]*//g' | cut -d " " -f1)
+	if [ $((Total % 1024 % 1024)) -eq 0 ]; then let Total=Total/1024 ;else let Total=(Total/1024/1024+1)*1024; fi
+	sed "/MEMORY_SIZE_M/c\MEMORY_SIZE_M = $Total" -i /etc/model.conf	
+	#fix mali firmware
+	mali_csffw_file=$(dmesg | grep mali | grep DDK | awk '(NR==1){print $0}' | awk -F' ' '{print $NF}' | cut -d - -f1)
+	ln -sf /lib/firmware/mali_csffw_${mali_csffw_file}/mali_csffw.bin /lib/firmware/mali_csffw.bin
+}
+
+patch_back()
+{
+	sed -i 's/^\([[:space:]]*\)if \[ -f \/tmp\/update_img.sh \]; then$/\1\/sbin\/qnap_patch -p\n&/' /etc/init.d/update.sh
+}
+
+while getopts ":fb" opt; do
+  case $opt in
+    f)
+	  #初始化boot前
+      patch_front
+      ;;
+    b)
+      #boot后加载
+	  patch_back
+      ;;  
+    \?)
+      echo "Invalid option: -$OPTARG" 
+      ;;
+  esac
+done
+exit 0
