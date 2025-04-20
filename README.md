@@ -235,16 +235,34 @@ patch -p1 < 0008-board-add-roc-rk3588s-pc-support.patch
 configs/roc-rk3588s-pc-rk3588s_defconfig复制进boards/roc-rk3588s-pc-emmc/board-org/备份,
 删除掉里面的rock-5c-rk3588s_defconfig.
 
-- 修改u-boot/u-boot-qnap/configs/roc-rk3588s-pc-rk3588s_defconfig文件,尾部添加
-```conf
-CONFIG_USE_BOOTARGS=y
-CONFIG_BOOTARGS="earlycon=uart8250,mmio32,0xfeb50000 ramoops.mem_address=0x110000 ramoops.mem_size=0xf0000 ramoops.console_size=0x80000 uboot_build_date=202308161711 qnap_model=ts642"
-CONFIG_SPL_FIT_IMAGE_KB=4096
-CONFIG_SPL_FIT_IMAGE_MULTIPLE=2
-CONFIG_LOADER_INI="RK3588_115200MINIALL.ini"
-CONFIG_ENV_IS_IN_MMC=y
-CONFIG_ROCKCHIP_SET_ETHADDR=y
-CONFIG_SYS_PROMPT="R-mt# "
+- 修改u-boot/u-boot-qnap/configs/roc-rk3588s-pc-rk3588s_defconfig文件,CONFIG_BAUDRATE改成115200 尾部添加BOOTARGS等
+```diff
+diff --git a/u-boot/u-boot-qnap/configs/roc-rk3588s-pc-rk3588s_defconfig b/u-boot/u-boot-qnap/configs/roc-rk3588s-pc-rk3588s_defconfig
+index 14a5d227..19b52891 100644
+--- a/u-boot/u-boot-qnap/configs/roc-rk3588s-pc-rk3588s_defconfig
++++ b/u-boot/u-boot-qnap/configs/roc-rk3588s-pc-rk3588s_defconfig
+@@ -179,7 +179,7 @@ CONFIG_RAMDISK_RO=y
+ CONFIG_DM_RESET=y
+ CONFIG_SPL_DM_RESET=y
+ CONFIG_SPL_RESET_ROCKCHIP=y
+-CONFIG_BAUDRATE=1500000
++CONFIG_BAUDRATE=115200
+ CONFIG_DEBUG_UART_BASE=0xFEB50000
+ CONFIG_DEBUG_UART_CLOCK=24000000
+ CONFIG_DEBUG_UART_SHIFT=2
+@@ -234,3 +234,12 @@ CONFIG_AVB_LIBAVB_ATX=y
+ CONFIG_AVB_LIBAVB_USER=y
+ CONFIG_RK_AVB_LIBAVB_USER=y
+ CONFIG_CHECK_VERSION_CHOOSE_DTB=y
++CONFIG_USE_BOOTARGS=y
++CONFIG_BOOTARGS="earlycon=uart8250,mmio32,0xfeb50000 ramoops.mem_address=0x110000 ramoops.mem_size=0xf0000 ramoops.console_size=0x80000 uboot_build_date=202308161711 qnap_model=ts642"
++CONFIG_SPL_FIT_IMAGE_KB=4096
++CONFIG_SPL_FIT_IMAGE_MULTIPLE=2
++CONFIG_LOADER_INI="RK3588_115200MINIALL.ini"
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_ROCKCHIP_SET_ETHADDR=y
++CONFIG_SYS_PROMPT="R-mt# "
++
 ```
 
 - 修改boards/roc-rk3588s-pc-emmc/custom.conf

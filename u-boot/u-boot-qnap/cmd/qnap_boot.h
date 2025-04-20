@@ -4,7 +4,7 @@
 /* 设备配置 */
 /* 设置默认eMMC设备号 (0/1) 0为EMMC 1为SD卡*/
 #define QNAP_BOOT_DEV          0      // 默认eMMC设备号
-#define QNAP_KERNEL_VERSION    512    // 默认固件版本
+#define QNAP_KERNEL_VERSION    523    // 默认固件版本
 #define QNAP_KERNEL_TYPE       "custom" // 内核模式
 #define EMMC_PART              2      // 固定分区号
 #define SERIAL_SECTOR          0x218000 // SN/MAC存储扇区
