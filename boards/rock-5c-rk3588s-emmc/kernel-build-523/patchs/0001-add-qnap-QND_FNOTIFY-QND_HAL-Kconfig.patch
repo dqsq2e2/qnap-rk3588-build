@@ -1,0 +1,29 @@
+From 55b83c824c457cac337ad985cb3b0d94180e939a Mon Sep 17 00:00:00 2001
+From: r_MT <wxzmz@163.com>
+Date: Fri, 21 Feb 2025 17:06:32 +0800
+Subject: [PATCH 1/4] add qnap QND_FNOTIFY QND_HAL Kconfig
+
+---
+ drivers/qnap/Kconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/qnap/Kconfig b/drivers/qnap/Kconfig
+index d1fe2c4ec..0e6c7480a 100644
+--- a/drivers/qnap/Kconfig
++++ b/drivers/qnap/Kconfig
+@@ -24,4 +24,12 @@ config QND_EC_BUZZER_SUPPORT
+         depends on X86_64 || X86
+         default n
+ 
++config QND_FNOTIFY
++        tristate "QND_FNOTIFY"
++        default m
++
++config QND_HAL
++        tristate "QND_HAL"
++        default m
++
+ endif
+-- 
+2.17.1
+

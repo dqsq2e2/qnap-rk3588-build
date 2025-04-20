@@ -32,7 +32,7 @@ config_check() {
     fi
 }
 
-# ==================== 配置加载 ======================
+# # ==================== 配置加载 ======================
 safe_source_config() {
     [[ -f "${CONFIG_FILE}" ]] || {
         echo -e "${RED}错误：配置文件缺失 ${CONFIG_FILE}${NC}"
@@ -1998,6 +1998,9 @@ init_environment() {
     config_check "${CONFIG_FILE}"
     safe_source_config  # 包含 source "${CONFIG_FILE}"
 
+    # ==================== 完整参数解析（覆盖所有配置） ====================
+    parse_arguments "$@"
+
     # ==================== 加载板级自定义配置 ====================
     # 注意：此时 BOARD_NAME 可能来自命令行参数或全局配置
     declare -g BOARD_DIR="${SRC}/boards/${BOARD_NAME}"
@@ -2005,9 +2008,6 @@ init_environment() {
         config_check "${BOARD_DIR}/custom.conf"
         source "${BOARD_DIR}/custom.conf"
     fi
-
-    # ==================== 完整参数解析（覆盖所有配置） ====================
-    parse_arguments "$@"
 
     declare -g LOG_DIR="${SRC}/build_logs"
     declare -g LOG_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
