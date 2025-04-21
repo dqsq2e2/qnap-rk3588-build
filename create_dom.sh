@@ -74,81 +74,8 @@ safe_source_config() {
     fi
 }
 
-validate_board_config() {
-    local board_dir="${SRC}/boards/${BOARD_NAME}"
-    local missing_dirs=()
-
-    # 基础目录验证
-    [[ -d "${board_dir}" ]] || {
-        echo "错误：板型目录不存在 ${board_dir}" >&2
-        exit 1
-    }
-
-    # 内核版本目录验证
-    for ver in "${!KERNEL_VERSIONS[@]}"; do
-        local required_dirs=(
-            "${board_dir}/dts-qnap-${ver}"
-            "${board_dir}/kernel-build-${ver}"
-        )
-
-        for dir in "${required_dirs[@]}"; do
-            [[ -d "${dir}" ]] || missing_dirs+=("${dir}")
-        done
-    done
-
-    (( ${#missing_dirs[@]} > 0 )) && {
-        echo "缺失目录：" >&2
-        printf "  %s\n" "${missing_dirs[@]}" >&2
-        exit 1
-    }
-
-    # 补丁目录强制验证
-    [[ -d "${board_dir}/patch" ]] || {
-        echo "错误：缺失补丁目录 ${board_dir}/patch" >&2
-        exit 1
-    }
-}
-
-validate_kernel_config() {
-    local -a errors=()
-    local required_keys=("part0" "dir" "parts" "tar_opts" "dtb_offset" "kernel_offset")
-
-    for ver in "${!KERNEL_VERSIONS[@]}"; do
-        declare -A config
-        eval "config=${KERNEL_VERSIONS[$ver]}" 2>/dev/null || {
-            errors+=("版本 $ver 配置解析失败")
-            continue
-        }
-
-        # 必要参数验证
-        for key in "${required_keys[@]}"; do
-            [[ -v config[$key] ]] || errors+=("版本 $ver 缺失必要参数 [$key]")
-        done
-
-        # 分卷配置验证
-        if [[ "${config[parts]}" =~ ^[0-9]+$ ]]; then
-            for ((i=0; i<config[parts]; i++)); do
-                local part_key="part$i"
-                [[ -v config[$part_key] ]] || errors+=("版本 $ver 缺失分卷配置 [$part_key]")
-            done
-        else
-            errors+=("版本 $ver 分卷数格式错误 [${config[parts]}]")
-        fi
-
-        # 偏移量验证
-        [[ "${config[dtb_offset]}" =~ ^0x[0-9a-fA-F]+$ ]] || errors+=("版本 $ver dtb_offset 格式错误")
-    done
-
-    (( ${#errors[@]} > 0 )) && {
-        echo -e "${RED}内核配置错误：${NC}"
-        printf "  ➜ %s\n" "${errors[@]}"
-        exit 1
-    }
-}
-
-
 # ==================== 命令行参数 ====================
-parse_arguments() {  # 调整到check_loader_board之前
+parse_arguments() {
     case "$1" in
         --init)
             # 初始化模式仅解析board参数
@@ -181,24 +108,7 @@ parse_arguments() {  # 调整到check_loader_board之前
     esac
 }
 
-check_loader_board() {
-    echo -e "\n${BLUE}▌ 执行综合配置检查 ▐${NC}"
-
-    # 配置文件基础检查
-    config_check "${CONFIG_FILE}"
-
-    # 安全加载配置
-    safe_source_config
-
-    # 板级配置验证
-    validate_board_config
-
-    # 内核配置验证
-    validate_kernel_config
-}
-
 # ==================== 命令行参数 ====================
-
 
 show_usage() {
     echo -e "\n${CYAN}QNAP构建脚本 ${VERSION}${NC}"
@@ -2094,5 +2004,4 @@ main() {
     echo -e "输出文件: ${BLUE}$(ls -lh ${qnap_dom_zip})${NC}"
 }
 
-init_environment "$@"  # 预初始化环境
 main "$@"
