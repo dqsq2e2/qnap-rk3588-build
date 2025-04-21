@@ -23,15 +23,6 @@ patch_front()
 patch_back()
 {
 	sed -i 's/^\([[:space:]]*\)if \[ -f \/tmp\/update_img.sh \]; then$/\1\/sbin\/qnap_patch -p\n&/' /etc/init.d/update.sh
-	if [ $(fw_printenv -n qnap_kernel_version) -lt 521 ]; then
-		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/uhid.ko
-		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/aic_btusb.ko
-		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/aic_load_fw.ko
-	else
-		/sbin/insmod /lib/modules/5.10.60-qnap/uhid.ko
-		/sbin/insmod /lib/modules/5.10.60-qnap/aic_btusb.ko
-		/sbin/insmod /lib/modules/5.10.60-qnap/aic_load_fw.ko
-	fi	
 }
 
 while getopts ":fbi" opt; do
