@@ -655,7 +655,7 @@ prepare_env() {
             echo -e "${RED}错误：工具链解压失败！${NC}"
             exit 1
         fi
-        rm -f "${toolchain_file}"
+        #rm -f "${toolchain_file}"
     fi
 
     # ==================== 全局环境变量设置 ====================
@@ -689,20 +689,47 @@ prepare_env() {
         local parts_files=()
         for ((i=0; i<parts; i++)); do
             local part_var="part${i}"
+            local md5_var="part${i}_md5"
             local part_url="${cfg[$part_var]}"
             local part_file="${kernel_root}/${base_name}_part${i}"
+            local expected_md5="${cfg[$md5_var]}"
+            local expected_size=$(curl -sI "$part_url" | awk '/Content-Length/ {print $2}' | tr -d '\r')
 
-            # 分卷下载
-            if [[ ! -f "${part_file}" ]]; then
-                echo -e "下载分卷 ${i}: ${part_url}"
-                if ! wget -q -t 3 -T 30 --show-progress -O "${part_file}" "${part_url}"; then
-                    echo -e "${RED}分卷 ${i} 下载失败！${NC}"
-                    exit 1
+            # 存在性检查与校验
+            if [[ -f "$part_file" ]]; then
+                # 计算实际MD5
+                actual_md5=$(md5sum "$part_file" | cut -d' ' -f1)
+                if [[ "$actual_md5" != "$expected_md5" ]]; then
+                    echo -e "${YELLOW}▶ MD5不匹配: ${part_file##*/} (${actual_md5:0:8}...)→删除重下${NC}"
+                    rm -f "$part_file"
+                else
+                    echo -e "${GREEN}✓ 分卷 ${i} 已存在且校验通过${NC}"
+                    parts_files+=("${part_file}")
+                    continue
                 fi
-            else
-                echo -e "${GREEN}✓ 分卷 ${i} 已存在${NC}"
             fi
-            parts_files+=("${part_file}")
+
+            # 断点续传下载（最多重试3次）
+            for retry in {1..3}; do
+                echo -e "下载分卷 ${i} (尝试 ${retry}/3): ${part_url}"
+                #if wget -c -q -t 3 -T 30 --show-progress -O "${part_file}" "${part_url}"; then
+                if wget -c -q -t 3 -T 30 --show-progress -O "${part_file}" "${part_url}"; then				
+                    # 下载后校验
+                    actual_md5=$(md5sum "$part_file" | cut -d' ' -f1)
+                    if [[ "$actual_md5" == "$expected_md5" ]]; then
+                        parts_files+=("${part_file}")
+                        break
+                    else
+                        echo -e "${RED}✗ MD5校验失败: ${actual_md5} (预期:${expected_md5})${NC}"
+                        rm -f "$part_file"
+                    fi
+                fi
+                # 最终重试失败处理
+                (( retry == 3 )) && { 
+                    echo -e "${RED}分卷 ${i} 下载失败！退出码: $?${NC}"
+                    exit 1
+                }
+            done
         done
 
         # ==================== 解压处理修复 ====================
