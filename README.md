@@ -472,7 +472,7 @@ SIO_HWMON_INDEX = 1
 ## 本项目会使用,下载,参考以下开源项目部分代码：
 - [Joshua-Riek/ubuntu-rockchip](https://github.com/Joshua-Riek/ubuntu-rockchip)
 - [armbian/linux-rockchip](https://github.com/armbian/linux-rockchip)
-- [radxa](https://github.com/radxa)
+- [radxa-uboot](https://github.com/radxa/u-boot) [radxa-rkbin](https://github.com/radxa/rkbin)
 - [firefly](https://gitlab.com/firefly-linux/prebuilts/gcc/linux-x86/aarch64/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu)
 - [qnap](https://sourceforge.net/projects/qosgpl/)
 
