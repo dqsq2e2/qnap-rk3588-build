@@ -998,14 +998,20 @@ compile_kernel() {
             ;;
         "auto")
             echo -e "${CYAN}▶ AUTO模式: 检测内核文件...${NC}"
-            # 检查所有内核文件是否存在
+            # 检查所有内核文件和模块目录
             for version in $(printf "%s\n" "${!KERNEL_VERSIONS[@]}" | sort -V); do
                 local kernel_image="${BOARD_DIR}/build-out/Image-${version}"
-                if [[ ! -f "${kernel_image}" ]]; then
+                local modules_dir="${BOARD_DIR}/build-out/${version}-modules"  # 新增模块目录检查
+                
+                # 双条件校验（内核文件 + 模块目录）
+                if [[ ! -f "${kernel_image}" || ! -d "${modules_dir}" ]]; then
                     missing_images+=("${kernel_image}")
-                    echo -e "${YELLOW}➤ 缺失内核文件: ${kernel_image}${NC}"
+                    echo -e "${YELLOW}➤ 缺失文件或目录:"
+                    [[ ! -f "${kernel_image}" ]] && echo "  - 内核文件: ${kernel_image##*/}"
+                    [[ ! -d "${modules_dir}" ]] && echo "  - 模块目录: ${modules_dir##*/}"
+                    echo -e "${NC}"
                 else
-                    echo -e "${GREEN}✓ 已存在: ${kernel_image}${NC}"
+                    echo -e "${GREEN}✓ 已存在: ${kernel_image##*/} + ${modules_dir##*/}${NC}"
                 fi
             done
 
@@ -1044,7 +1050,8 @@ compile_kernel() {
         # 动态路径配置
         local conf_file="${BOARD_DIR}/kernel-build-${version}/kernel-build.conf"
         local kernel_image="${BOARD_DIR}/build-out/Image-${version}"
-
+		local modules_dir="${BOARD_DIR}/build-out/${version}-modules"
+		
         # 跳过不存在的配置文件
         [[ ! -f "${conf_file}" ]] && {
             echo -e "${YELLOW}⚠ 跳过未配置版本: ${version} (缺失 ${conf_file})${NC}"
@@ -1052,8 +1059,8 @@ compile_kernel() {
         }
 
         # 自动模式存在检查
-        if [[ "${KERNEL_MODE}" == "auto" && -f "${kernel_image}" ]]; then
-            echo -e "${GREEN}✓ 跳过已存在的: $(basename "${kernel_image}")${NC}"
+        if [[ "${KERNEL_MODE}" == "auto" && -f "${kernel_image}" && -d "${modules_dir}" ]]; then
+            echo -e "${GREEN}✓ 跳过已存在的: $(basename "${kernel_image}") + ${modules_dir##*/}${NC}"
             continue
         fi
 
@@ -1136,16 +1143,27 @@ compile_kernel() {
 
 			touch "include/config.h"
             make olddefconfig >/dev/null 2>&1
+            
+            # 强制模式时删除旧模块目录
+            if [[ "${KERNEL_MODE}" =~ only|force ]] && [[ -d "${modules_dir}" ]]; then
+                echo -e "${YELLOW}▶ 清理旧模块目录: ${modules_dir}${NC}"
+                rm -rf "${modules_dir}"
+            fi
+            
+            # 确保目录存在（自动创建）
+            mkdir -p "${modules_dir}"			
 
             # 执行编译（启用ccache加速）
-            echo -e "${CYAN}▶ 开始编译内核 (使用 $(nproc) 线程)...${NC}"
-            if ! make -j$(nproc) \
-                CFLAGS_KERNEL="${CFLAGS_KERNEL}" \
-                CFLAGS_MODULE="${CFLAGS_MODULE}" \
-                2>&1 | tee "kernel_compile-${version}.log"; then
-                echo -e "${RED}错误：内核编译失败！查看日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
-                exit 1
-            fi
+			echo -e "${CYAN}▶ 开始编译内核 (使用 $(nproc) 线程)...${NC}"
+			if ! make -j$(nproc) \
+				CFLAGS_KERNEL="${CFLAGS_KERNEL}" \
+				CFLAGS_MODULE="${CFLAGS_MODULE}" \
+				INSTALL_MOD_PATH="${modules_dir}" \
+				modules_install \
+				2>&1 | tee "kernel_compile-${version}.log"; then
+				echo -e "${RED}错误：内核编译失败！查看日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
+				exit 1
+			fi
 
 			echo -e "${GREEN}✔ kernel-${version}编译成功！查看详细日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
 
@@ -1160,6 +1178,12 @@ compile_kernel() {
     ls -lh "${BOARD_DIR}/build-out"/Image-* 2>/dev/null || {
         echo -e "${YELLOW}⚠ 未找到任何内核文件${NC}"
     }
+
+    echo -e "\n${CYAN}模块目录状态：${NC}"
+    for version in "${!KERNEL_VERSIONS[@]}"; do
+        ls -ld "${BOARD_DIR}/build-out/${version}-modules" 2>/dev/null || 
+        echo -e "${YELLOW}⚠ 缺失模块目录: ${version}-modules${NC}"
+    done
 }
 
 # ==================== 新增函数 add_kread ====================
