@@ -1128,20 +1128,20 @@ compile_kernel() {
             > .version
 
             echo -e "${CYAN}▶ 加载内核配置...${NC}"
-			#使用boards/board/kernel-build-version/kernel-build.conf中的kernel_config_manager的函数 设定特定内核参数
+            #使用boards/board/kernel-build-version/kernel-build.conf中的kernel_config_manager的函数 设定特定内核参数
             #kernel_config_manager .config
 
-			if [[ -f "${kernel_custom_cfg_src}" ]]; then
-				echo -e "${CYAN}▶ 应用自定义内核配置...${NC}"
-				cp -vf "${kernel_custom_cfg_src}" "${kernel_cfg_dest}"
-				echo -e "${GREEN}✓ 自定义内核配置完成${NC}"
-			else
-				echo -e "${CYAN}▶ 应用kernel-build.conf内核配置...${NC}"
-				cp -vf "${kernel_cfg_src}" "${kernel_cfg_dest}"
-				kernel_config_manager .config
-			fi
+            if [[ -f "${kernel_custom_cfg_src}" ]]; then
+            	echo -e "${CYAN}▶ 应用自定义内核配置...${NC}"
+            	cp -vf "${kernel_custom_cfg_src}" "${kernel_cfg_dest}"
+            	echo -e "${GREEN}✓ 自定义内核配置完成${NC}"
+            else
+            	echo -e "${CYAN}▶ 应用kernel-build.conf内核配置...${NC}"
+            	cp -vf "${kernel_cfg_src}" "${kernel_cfg_dest}"
+            	kernel_config_manager .config
+            fi
 
-			touch "include/config.h"
+            touch "include/config.h"
             make olddefconfig >/dev/null 2>&1
             
             # 强制模式时删除旧模块目录
@@ -1154,18 +1154,18 @@ compile_kernel() {
             mkdir -p "${modules_dir}"			
 
             # 执行编译（启用ccache加速）
-			echo -e "${CYAN}▶ 开始编译内核 (使用 $(nproc) 线程)...${NC}"
-			if ! make -j$(nproc) \
-				CFLAGS_KERNEL="${CFLAGS_KERNEL}" \
-				CFLAGS_MODULE="${CFLAGS_MODULE}" \
-				INSTALL_MOD_PATH="${modules_dir}" \
-				modules_install \
-				2>&1 | tee "kernel_compile-${version}.log"; then
-				echo -e "${RED}错误：内核编译失败！查看日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
-				exit 1
-			fi
+            echo -e "${CYAN}▶ 开始编译内核 (使用 $(nproc) 线程)...${NC}"
+            if ! make -j$(nproc) \
+            	CFLAGS_KERNEL="${CFLAGS_KERNEL}" \
+            	CFLAGS_MODULE="${CFLAGS_MODULE}" \
+            	INSTALL_MOD_PATH="${modules_dir}" \
+            	modules_install \
+            	2>&1 | tee "kernel_compile-${version}.log"; then
+            	echo -e "${RED}错误：内核编译失败！查看日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
+            	exit 1
+            fi
 
-			echo -e "${GREEN}✔ kernel-${version}编译成功！查看详细日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
+            echo -e "${GREEN}✔ kernel-${version}编译成功！查看详细日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
 
             mkdir -p "${BOARD_DIR}/build-out"
             add_kread "arch/arm64/boot/Image" "${kernel_image}" || exit 1
