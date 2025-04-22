@@ -1,0 +1,62 @@
+From 09749f8d8fa9a3d727d77f6c2921d1b10f05a95b Mon Sep 17 00:00:00 2001
+From: r_MT <wxzmz@163.com>
+Date: Fri, 21 Feb 2025 17:35:30 +0800
+Subject: [PATCH 4/4] fix qnap tty
+
+---
+ drivers/tty/serial/8250/8250_core.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 576cd744a..e27595ba2 100755
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -926,9 +926,9 @@ static DEFINE_MUTEX(serial_mutex);
+ #if defined(CONFIG_ARCH_ALPINE) || defined(CONFIG_ARCH_MVEBU) || defined(CONFIG_ARCH_RTD129X) || defined(CONFIG_ARCH_ROCKCHIP)
+ int serial8250_write_char(int port, char val)
+ {
+-    struct uart_8250_port *up = &serial8250_ports[port];
++/*     struct uart_8250_port *up = &serial8250_ports[port];
+ 
+-    serial_out(up, UART_TX, val);
++    serial_out(up, UART_TX, val); */
+ 
+     return 0;
+ }
+@@ -940,6 +940,7 @@ EXPORT_SYMBOL(serial8250_write_char);
+ #if defined(CONFIG_ARCH_ALPINE) || defined(CONFIG_ARCH_MVEBU) || defined(CONFIG_ARCH_RTD129X) || defined(CONFIG_ARCH_ROCKCHIP)
+ void kernel_booting_buzzer(void)
+ {
++/*
+ #if defined(CONFIG_ARCH_ALPINE)
+     struct uart_8250_port *up = &serial8250_ports[1];
+ #elif defined(CONFIG_ARCH_MVEBU)
+@@ -961,19 +962,20 @@ void kernel_booting_buzzer(void)
+     u32 baudDivisor;
+ 
+     baudDivisor = p->uartclk / (16 * 115200);
+-    serial_port_out(p, UART_LCR, UART_LCR_DLAB);  /* set DLAB bit */
+-    serial_dl_write(up, baudDivisor);  /* set baudrate divisor */
+-    serial_port_out(p, UART_LCR, 0x3); /* clear DLAB; set 8 bits, no parity */
++    serial_port_out(p, UART_LCR, UART_LCR_DLAB);
++    serial_dl_write(up, baudDivisor);
++    serial_port_out(p, UART_LCR, 0x3);
+ 
+ #if defined(CONFIG_ARCH_ALPINE)
+-    serial_out(up, UART_TX, 0x50); /* 0x50 is mcu 0.5 sec buzzer cmd */
++    serial_out(up, UART_TX, 0x50);
+ #elif defined(CONFIG_ARCH_MVEBU) || defined(CONFIG_ARCH_RTD129X) || defined(CONFIG_ARCH_ROCKCHIP)
+     for(i=0;i<sizeof(buzzer_cmd);i++) {
+         //printk("---- buzzer_cmd[%d] = 0x%02x\n", i, buzzer_cmd[i]);
+-        serial_out(up, UART_TX, buzzer_cmd[i]); /* 0.5 sec buzzer cmd */
++        serial_out(up, UART_TX, buzzer_cmd[i]);
+         udelay(200);
+     }
+ #endif
++*/
+     printk("---- kernel_booting_buzzer\n");
+     return;
+ }
+-- 
+2.17.1
+
