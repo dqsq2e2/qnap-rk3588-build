@@ -1001,7 +1001,7 @@ compile_kernel() {
             # 检查所有内核文件和模块目录
             for version in $(printf "%s\n" "${!KERNEL_VERSIONS[@]}" | sort -V); do
                 local kernel_image="${BOARD_DIR}/build-out/Image-${version}"
-                local modules_dir="${BOARD_DIR}/build-out/${version}-modules"  # 新增模块目录检查
+                local modules_dir="${BOARD_DIR}/build-out/modules-${version}"  # 新增模块目录检查
                 
                 # 双条件校验（内核文件 + 模块目录）
                 if [[ ! -f "${kernel_image}" || ! -d "${modules_dir}" ]]; then
@@ -1050,7 +1050,7 @@ compile_kernel() {
         # 动态路径配置
         local conf_file="${BOARD_DIR}/kernel-build-${version}/kernel-build.conf"
         local kernel_image="${BOARD_DIR}/build-out/Image-${version}"
-		local modules_dir="${BOARD_DIR}/build-out/${version}-modules"
+		local modules_dir="${BOARD_DIR}/build-out/modules-${version}"
 		
         # 跳过不存在的配置文件
         [[ ! -f "${conf_file}" ]] && {
@@ -1181,8 +1181,8 @@ compile_kernel() {
 
     echo -e "\n${CYAN}模块目录状态：${NC}"
     for version in "${!KERNEL_VERSIONS[@]}"; do
-        ls -ld "${BOARD_DIR}/build-out/${version}-modules" 2>/dev/null || 
-        echo -e "${YELLOW}⚠ 缺失模块目录: ${version}-modules${NC}"
+        ls -ld "${BOARD_DIR}/build-out/modules-${version}" 2>/dev/null || 
+        echo -e "${YELLOW}⚠ 缺失模块目录: modules-${version}${NC}"
     done
 }
 
