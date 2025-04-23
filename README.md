@@ -497,6 +497,11 @@ SIO_HWMON_INDEX = 1
 - [firefly](https://gitlab.com/firefly-linux/prebuilts/gcc/linux-x86/aarch64/gcc-arm-10.3-2021.07-x86_64-aarch64-none-linux-gnu)
 - [qnap](https://sourceforge.net/projects/qosgpl/)
 
+## 📦 QNAP AI642 HD-STATION APPS资源下载
+百度网盘： https://pan.baidu.com/s/1k2al-bnmGT-eXW9u-t_sSA?pwd=fktu
+
+## 📦 QNAP AI642 Ubuntu Linux Station安装补丁
+https://github.com/wxzmz/qnap-rk3588-ubuntu
 
 ## 📜 许可协议
 
