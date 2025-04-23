@@ -284,7 +284,7 @@ https://github.com/armbian/linux-rockchip/blob/rk-5.10-rkr8/arch/arm64/boot/dts/
 
 down下来,复制到boards/roc-rk3588s-pc-emmc/board-org/目录备份
 同时删除掉boards/roc-rk3588s-pc-emmc/board-org/rock-5c-rk3588s.dts
-修改rk3588s-roc-pc.dts文件后复制进boards/roc-rk3588s-pc-emmc/dts-qnap-510/目录 以及dts-qnap-520/目录,
+修改rk3588s-roc-pc.dts文件后复制进boards/roc-rk3588s-pc-emmc/dts-qnap-520/目录 以及dts-qnap-523/目录,
 同时删除里面的rock-5c-rk3588s.dts
 
 ```diff
@@ -399,7 +399,7 @@ DTS_FILES="rk3588s-roc-pc"
  ```conf
         ["AIC8800-蓝牙wifi驱动"]="CONFIG_AIC_WLAN_SUPPORT=y\nCONFIG_AIC8800_WLAN_SUPPORT=m\nCONFIG_AIC_LOADFW_SUPPORT=m"
  ```
-删除boards/roc-rk3588s-pc-emmc/kernel-build-510/patchs 以及kernel-build-520/patchs目录中的对应的aic8800补丁文件
+删除boards/roc-rk3588s-pc-emmc/kernel-build-520/patchs 以及kernel-build-523/patchs目录中的对应的aic8800补丁文件
  ```txt
 0005-fix-add-aic-usb-blue.patch
 0006-add-usb-aic8800-wif-driver-org.patch
