@@ -118,12 +118,19 @@ DTS_FILES="rk3588s-rock-5c"
 以我的 firefly ROC-RK3588S-PC STATION-M3 做适配
 https://www.t-firefly.com/product/industry/rocrk3588spc
 这里我硬盘用的是 pcie m2
-### 1.克隆同样是rk3588s的rock-5c的版型作为模板
+
+### 1.修改主配置文件boards/qnap_build.conf
+ ```conf
+ BOARD_NAME="roc-rk3588s-pc-emmc"
+ ```
+
+### 2.克隆同样是rk3588s的rock-5c的版型作为模板
 ```bash
 cp -ar boards/rock-5c-rk3588s-emmc boards/roc-rk3588s-pc-emmc
 rm -rf boards/roc-rk3588s-pc-emmc/build-out
-``` 
-### 2.修正qnap的qts系统补丁,目录boards/roc-rk3588s-pc-emmc/patch/
+```
+
+### 3.修正qnap的qts系统补丁,目录boards/roc-rk3588s-pc-emmc/patch/
 
 ROC-RK3588S-PC 的linux启动,启动前自行修改dtb中的M2接口
 
@@ -222,7 +229,7 @@ usb 写法也类似,自行修正
 		/sbin/insmod /lib/modules/5.10.60-qnap/aic_load_fw.ko
 	fi	
 ```
-### 2.uboot适配
+### 4.uboot适配
 查看u-boot/u-boot-qnap/configs/目录 并没有rk3588s-roc-pc相关的defconfig, 可以去如下网址下载uboot补丁
 
 https://github.com/Joshua-Riek/ubuntu-rockchip/tree/main/packages/u-boot-radxa-rk3588/debian/patches
@@ -270,11 +277,17 @@ index 14a5d227..19b52891 100644
 UBOOT_CONFIG="roc-rk3588s-pc-rk3588s"
  ```
 
- - 如没有对应机型的uboot适配,这里改成rk3588通用版型,不一定能保证正常启动
+- 如没有对应机型的uboot适配,这里改成rk3588通用版型,不一定能保证正常启动
 ```conf
 UBOOT_CONFIG="rk3588"
  ```
- ### 3.dts适配
+ 
+- uboot编译调试, 仅编译uboot.
+ ```bash
+./create_dom.sh uboot=only
+```
+ 
+ ### 5.dts适配
  获取ROC-RK3588S-PC的5.10内核的dts, 可以在firefly官网的下载linux sdk获取, 但是比较繁琐
 这里直接从Joshua-Riek的Ubuntu获取
 https://github.com/Joshua-Riek/linux-rockchip/blob/jammy/arch/arm64/boot/dts/rockchip/rk3588s-roc-pc.dts
@@ -393,7 +406,13 @@ index 111908a..f30d498 100644
 ```conf
 DTS_FILES="rk3588s-roc-pc"
  ```
- ### 4.内核适配 
+ 
+- dtb编译调试, 仅编译dtb.
+ ```bash
+./create_dom.sh dtb=only
+```
+ 
+ ### 6.内核适配 
  分别修改boards/roc-rk3588s-pc-emmc/kernel-build-510/kernel-build.conf 以及kernel-build-520/kernel-build.conf
  删除其中的下列行,这是给rock-5c的aic8800的驱动编译的内核删除
  ```conf
@@ -406,18 +425,20 @@ DTS_FILES="rk3588s-roc-pc"
 0007-change-aic8800-firmware-patch-to-lib-firmware.patch
  ```
 
- ### 5.修改boards/qnap_build.conf
- ```conf
- BOARD_NAME="roc-rk3588s-pc-emmc"
- ```
+- kernel编译调试, 仅编译内核以及内核模块
+ ```bash
+./create_dom.sh kernel=only
+```
 
- ### 6.回到qnap-build主目录执行编译指令
+调试完成后 将boards/roc-rk3588s-pc-emmc/build-out/modules-523/中需要的相关内核模块 自行复制 进boards/roc-rk3588s-pc-emmc/patch/lib/modules/5.10.60-qnap/目录,并自行处理boards/roc-rk3588s-pc-emmc/patch/sbin/patch 相关内核模块挂载点
+
+ ### 7.回到qnap-build主目录执行编译指令
  ```bash
 ./create_dom.sh
 ```
  生成roc-rk3588s-pc-emmc-523-20250419.zip
 
- ### 7.调试
+ ### 8.调试
   roc-rk3588s-pc-emmc-523-20250419.zip解压后全盘刷入roc-rk3588s-pc的emmc
   正常安装系统,发现风扇一直全速运转,qnap下admin权限 执行
  ```bash  
@@ -457,7 +478,7 @@ SIO_HWMON_INDEX = 1
 重启生效,重启后查看风扇已经自动温控了
 
 
- ### 8.完成roc-rk3588s-pc-emmc的patch修正
+ ### 9.完成roc-rk3588s-pc-emmc的patch修正
 修改boards/roc-rk3588s-pc-emmc/patch/etc/model.conf
 ```conf
 SIO_HWMON_INDEX = 1
