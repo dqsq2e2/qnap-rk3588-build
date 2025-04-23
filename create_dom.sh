@@ -916,6 +916,35 @@ compile_dtb() {
             echo -e "${RED}错误：DTS目录不存在 ${board_dts_dir}${NC}"
             exit 1
         fi
+		
+        # ==================== 新增补丁处理步骤 ====================
+        local patch_dir="${BOARD_DIR}/kernel-build-${version}/patchs"
+        if [[ -d "${patch_dir}" ]]; then
+            echo -e "${CYAN}▶ 处理DTB补丁 (共 $(ls "${patch_dir}"/*.patch 2>/dev/null | wc -l) 个)${NC}"
+            
+            # 进入内核源码目录应用补丁
+            (
+                cd "${kernel_src_dir}" || exit 1
+                # 按版本排序应用补丁
+                for patch in $(ls "${patch_dir}"/*.patch 2>/dev/null | sort -V); do
+                    echo -e "应用补丁: ${YELLOW}$(basename "${patch}")${NC}"
+
+                    # 预检查补丁
+                    if ! patch --dry-run -p1 -N -s < "${patch}" &>/dev/null; then
+                        echo -e "${YELLOW}⚠ 补丁已存在或冲突，跳过: ${patch}${NC}"
+                        continue
+                    fi
+
+                    # 实际应用
+                    if patch -p1 -N < "${patch}"; then
+                        echo -e "${GREEN}✓ 补丁应用成功${NC}"
+                    else
+                        echo -e "${RED}✗ 补丁应用失败! 错误码: $?${NC}"
+                        exit 1
+                    fi
+                done
+            ) || exit 1
+        fi		
 
         # 4. 创建版本化符号链接
         local main_dts="${DTS_FILES}.dts"
