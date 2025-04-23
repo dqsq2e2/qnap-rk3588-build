@@ -870,7 +870,7 @@ compile_dtb() {
         local dir="GPL_QTS-${version}"
         local kernel_src_dir="${kernel_root}/${dir}/src/linux-5.10"
         local dtb_output="${BOARD_DIR}/build-out/${BOARD_NAME}_qnap-${version}.dtb"
-        local board_dts_dir="${BOARD_DIR}/dts-qnap-${version}"
+        local board_dts_dir="${SRC}/boards/dts-files"
 
         # ==================== 严格目录检查 ====================
         if [[ ! -d "${board_dts_dir}" ]]; then
@@ -1149,7 +1149,7 @@ compile_kernel() {
                 echo -e "${YELLOW}▶ 清理旧模块目录: ${modules_dir}${NC}"
                 rm -rf "${modules_dir}"
             fi
-
+            
             # 确保目录存在（自动创建）
             mkdir -p "${modules_dir}"			
 
@@ -1829,6 +1829,11 @@ validate_board_dirs() {
         echo -e "${RED}错误：板级目录不存在 ${board_dir}${NC}"
         exit 1
     }
+	
+    [[ -d "${SRC}/boards/dts-files" ]] || {
+        echo -e "${RED}错误：dts目录不存在 ${SRC}/boards/dts-files${NC}"
+        exit 1
+    }
 
     # ==================== 强制校验 patch 目录 ====================
     local required_common_dirs=(
@@ -1849,7 +1854,6 @@ validate_board_dirs() {
     for ver in "${!KERNEL_VERSIONS[@]}"; do
         local clean_ver="${ver//[^0-9]/}"
         local required_ver_dirs=(
-            "${board_dir}/dts-qnap-${clean_ver}"
             "${board_dir}/kernel-build-${clean_ver}"
         )
 
