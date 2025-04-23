@@ -1149,21 +1149,31 @@ compile_kernel() {
                 echo -e "${YELLOW}▶ 清理旧模块目录: ${modules_dir}${NC}"
                 rm -rf "${modules_dir}"
             fi
-            
+
             # 确保目录存在（自动创建）
             mkdir -p "${modules_dir}"			
 
             # 执行编译（启用ccache加速）
             echo -e "${CYAN}▶ 开始编译内核 (使用 $(nproc) 线程)...${NC}"
             if ! make -j$(nproc) \
-            	CFLAGS_KERNEL="${CFLAGS_KERNEL}" \
-            	CFLAGS_MODULE="${CFLAGS_MODULE}" \
-            	INSTALL_MOD_PATH="${modules_dir}" \
-            	modules_install \
-            	2>&1 | tee "kernel_compile-${version}.log"; then
-            	echo -e "${RED}错误：内核编译失败！查看日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
+                CFLAGS_KERNEL="${CFLAGS_KERNEL}" \
+                CFLAGS_MODULE="${CFLAGS_MODULE}" \
+                Image modules ; then
+                echo -e "${RED}错误：内核编译失败！查看日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
+                exit 1
+            fi
+
+            if ! make INSTALL_MOD_PATH="${modules_dir}" modules_install; then
+            	echo -e "${RED}✗ 模块安装失败！查看日志: ${kernel_src_dir}/modules_install-${version}.log${NC}"
             	exit 1
             fi
+
+            {
+            	echo "==== 内核编译日志 ===="
+            	cat "kernel_compile-${version}.log"
+            	echo -e "\n\n==== 模块安装日志 ===="
+            	cat "modules_install-${version}.log"
+            } > "full_build_log-${version}.log"			
 
             echo -e "${GREEN}✔ kernel-${version}编译成功！查看详细日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
 
