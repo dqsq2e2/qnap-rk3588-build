@@ -916,18 +916,15 @@ compile_dtb() {
             echo -e "${RED}错误：DTS目录不存在 ${board_dts_dir}${NC}"
             exit 1
         fi
-		
+
         # ==================== 新增补丁处理步骤 ====================
         local patch_dir="${SRC}/qnap-kernel-config/kernel-patchs-${version}"
-        local conf_file="${BOARD_DIR}/kernel-build-${version}/kernel-build.conf"
+        # 修复数组引用方式（移除eval）
+        local DTB_PATCH_FILES=(${DTB_PATCH_SET[$version]})
+        echo "Valid patches for $version: ${DTB_PATCH_FILES[@]} in ${patch_dir}"
         
-        if [[ -f "${conf_file}" ]]; then
-            source "${conf_file}"
-            echo -e "${CYAN}▶ 加载DTB补丁配置: ${conf_file}${NC}"
-        fi
-		echo "test2 patch_dir = ${patch_dir} and DTB_PATCH_FILES = ${DTB_PATCH_FILES}"
-        if [[ -d "${patch_dir}" && -n "${DTB_PATCH_FILES}" ]]; then
-            echo -e "${CYAN}▶ 处理DTB补丁 (共 $(echo ${DTB_PATCH_FILES} | wc -w) 个)${NC}"
+        if [[ -d "${patch_dir}" && ${#DTB_PATCH_FILES[@]} -gt 0 ]]; then
+            echo -e "${CYAN}▶ 处理DTB补丁 (共 ${#DTB_PATCH_FILES[@]} 个)${NC}"
             
             (
                 cd "${kernel_src_dir}" || exit 1
@@ -952,7 +949,8 @@ compile_dtb() {
                     fi
                 done
             ) || exit 1
-        fi	
+        fi
+		
 
         # 4. 创建版本化符号链接
         local main_dts="${DTS_FILES}.dts"
@@ -1901,23 +1899,23 @@ validate_board_dirs() {
         fi
     done
 
-    # ==================== 校验版本相关目录 ====================
-    for ver in "${!KERNEL_VERSIONS[@]}"; do
-        local clean_ver="${ver//[^0-9]/}"
-        local required_ver_dirs=(
-            "${board_dir}/kernel-build-${clean_ver}"
-        )
+    # # ==================== 校验版本相关目录 ====================
+    # for ver in "${!KERNEL_VERSIONS[@]}"; do
+        # local clean_ver="${ver//[^0-9]/}"
+        # local required_ver_dirs=(
+            # "${board_dir}/kernel-build-${clean_ver}"
+        # )
 
-        # 校验版本目录
-        for dir in "${required_ver_dirs[@]}"; do
-            if [[ ! -d "$dir" ]]; then
-                missing_dirs+=("$(basename "$dir")")
-                echo -e "${RED}✗ 缺失版本目录: ${dir#${SRC}/} (v${clean_ver})${NC}"
-            else
-                echo -e "${GREEN}✓ 版本目录存在: ${dir#${SRC}/} (v${clean_ver})${NC}"
-            fi
-        done
-    done
+        # # 校验版本目录
+        # for dir in "${required_ver_dirs[@]}"; do
+            # if [[ ! -d "$dir" ]]; then
+                # missing_dirs+=("$(basename "$dir")")
+                # echo -e "${RED}✗ 缺失版本目录: ${dir#${SRC}/} (v${clean_ver})${NC}"
+            # else
+                # echo -e "${GREEN}✓ 版本目录存在: ${dir#${SRC}/} (v${clean_ver})${NC}"
+            # fi
+        # done
+    # done
 
     if (( ${#missing_dirs[@]} > 0 )); then
         echo -e "\n${RED}错误：板级目录结构不完整！${NC}"
