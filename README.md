@@ -44,14 +44,15 @@
 .
 ├── boards/                # 设备配置目录
 │   ├── qnap_build.conf    # 主构建配置文件
+│   ├── dts-files          # 各版型设备树文件
 │   └── [板型名称]/         # 各设备独立配置
-│       ├── dts-qnap-*/    # 设备树源文件
 │       ├── kernel-build-* # 内核构建配置
 │       ├── patch/         # qts系统补丁文件
 │       ├── build-out/     # 自动创建,构建过程文件
 │       └── custom.conf    # 板级配置文件
 ├── qnap-tools/            # qnap PC1以及源码
 ├── u-boot/                # U-Boot源码
+├── qnap-kernel-config/    # qnap 内核版本patch
 ├── qnap-kernel/           # 自动创建,qnap内核源码
 ├── qnap-firmware/         # 自动创建,qnap官方固件
 ├── build_logs/            # 自动创建,构建日志存储
@@ -99,7 +100,7 @@ QNAP_FIRMWARE_FILE="TS-X42_20250108-5.2.3.3006.zip"
 UBOOT_CONFIG="rock-5c-rk3588s"
 #对应u-boot/u-boot-qnap/configs/中的rock-5c-rk3588s_defconfig文件
 DTS_FILES="rk3588s-rock-5c"
-#对应boards/rock-5c-rk3588s-emmc/dts-qnap-5X0/中rk3588s-rock-5c.dts
+#对应boards/dts-files/中rk3588s-rock-5c.dts
 ```
 ### 常用参数说明
 | 参数                 | 可选值              | 说明                      |
