@@ -1083,15 +1083,15 @@ compile_kernel() {
     # ==================== 多版本编译 ====================
     for version in $(printf "%s\n" "${!KERNEL_VERSIONS[@]}" | sort -V); do
         # 动态路径配置
-        local conf_file="${BOARD_DIR}/kernel-build-${version}/kernel-build.conf"
+        #local conf_file="${BOARD_DIR}/kernel-build-${version}/kernel-build.conf"
         local kernel_image="${BOARD_DIR}/build-out/Image-${version}"
 		local modules_dir="${BOARD_DIR}/build-out/modules-${version}"
 		
-        # 跳过不存在的配置文件
-        [[ ! -f "${conf_file}" ]] && {
-            echo -e "${YELLOW}⚠ 跳过未配置版本: ${version} (缺失 ${conf_file})${NC}"
-            continue
-        }
+        # # 跳过不存在的配置文件
+        # [[ ! -f "${conf_file}" ]] && {
+            # echo -e "${YELLOW}⚠ 跳过未配置版本: ${version} (缺失 ${conf_file})${NC}"
+            # continue
+        # }
 
         # 自动模式存在检查
         if [[ "${KERNEL_MODE}" == "auto" && -f "${kernel_image}" && -d "${modules_dir}" ]]; then
@@ -1105,12 +1105,12 @@ compile_kernel() {
         # ==================== 编译准备 ====================
         echo -e "\n${BLUE}▍ 开始编译 ${version} 内核 ▍${NC}"
 
-        # 加载内核配置
-        config_check "${conf_file}"
-        source "${conf_file}" || {
-            echo -e "${RED}错误：加载配置文件失败 ${conf_file}${NC}"
-            exit 1
-        }
+        # # 加载内核配置
+        # config_check "${conf_file}"
+        # source "${conf_file}" || {
+            # echo -e "${RED}错误：加载配置文件失败 ${conf_file}${NC}"
+            # exit 1
+        # }
 
         # 内核源码路径
         local kernel_dir="GPL_QTS-${version}"
@@ -1132,24 +1132,20 @@ compile_kernel() {
         (
             echo -e "${CYAN}▶ 进入编译目录: ${kernel_src_dir}${NC}"
             cd "${kernel_src_dir}" || exit 1
-
-            # 应用补丁
-			local patch_dir="${SRC}/qnap-kernel-config/kernel-patchs-${version}"
-			echo -e "test patch_dir = ${patch_dir}"
-			if [[ -d "${patch_dir}" ]]; then
-				echo -e "${CYAN}▶ 处理补丁 (使用版本${version}配置)${NC}"
-				
-				# 加载补丁配置
-				if [[ -f "${conf_file}" ]]; then
-					source "${conf_file}"
-					if [[ -n "${PATCH_FILES}" ]]; then
-						echo "使用配置指定的补丁列表: ${PATCH_FILES}"
-					fi
-				fi
 			
-				# 按配置顺序应用补丁
-				for patch_name in ${PATCH_FILES}; do
-					patch="${patch_dir}/${patch_name}"
+        # ==================== 修正补丁处理 ====================
+        local patch_dir="${SRC}/qnap-kernel-config/kernel-patchs-${version}"
+        # 使用KERNEL_PATCH_SET代替PATCH_FILES
+        local KERNEL_PATCH_FILES=(${KERNEL_PATCH_SET[$version]})
+        echo "Valid kernel patches for $version: ${KERNEL_PATCH_FILES[@]} in ${patch_dir}"
+
+        if [[ -d "${patch_dir}" && ${#KERNEL_PATCH_FILES[@]} -gt 0 ]]; then
+            echo -e "${CYAN}▶ 处理内核补丁 (共 ${#KERNEL_PATCH_FILES[@]} 个)${NC}"
+            
+            (
+                cd "${kernel_src_dir}" || exit 1
+                for patch_name in "${KERNEL_PATCH_FILES[@]}"; do
+                    patch="${patch_dir}/${patch_name}"
 					if [[ -f "${patch}" ]]; then
 						echo -e "应用补丁: ${YELLOW}${patch_name}${NC}"
 						
@@ -1170,64 +1166,75 @@ compile_kernel() {
 						echo -e "${YELLOW}⚠ 补丁文件缺失: ${patch_name}${NC}"
 					fi
 				done
-			fi
+            ) || exit 1
+        fi			
 
-            # 清理并配置
-            echo -e "${CYAN}▶ 重置内核版本标识...${NC}"
-            > .version
+        # 清理并配置
+        echo -e "${CYAN}▶ 重置内核版本标识...${NC}"
+        > .version
+        
+        echo -e "${CYAN}▶ 加载内核配置...${NC}"
+        #使用boards/board/kernel-build-version/kernel-build.conf中的kernel_config_manager的函数 设定特定内核参数
+        #kernel_config_manager .config
+        
+        if [[ -f "${kernel_custom_cfg_src}" ]]; then
+        	echo -e "${CYAN}▶ 应用自定义内核配置...${NC}"
+        	cp -vf "${kernel_custom_cfg_src}" "${kernel_cfg_dest}"
+        	echo -e "${GREEN}✓ 自定义内核配置完成${NC}"
+        else
+        	echo -e "${CYAN}▶ 应用custom.conf内核配置...${NC}"
+        	cp -vf "${kernel_cfg_src}" "${kernel_cfg_dest}"
+        	kernel_config_manager ${version} .config
+        fi
+        
+        touch "include/config.h"
+        make olddefconfig >/dev/null 2>&1
+        
+        # 强制模式时删除旧模块目录
+        if [[ "${KERNEL_MODE}" =~ only|force ]] && [[ -d "${modules_dir}" ]]; then
+            echo -e "${YELLOW}▶ 清理旧模块目录: ${modules_dir}${NC}"
+            rm -rf "${modules_dir}"
+        fi
+        
+        # 确保目录存在（自动创建）
+        mkdir -p "${modules_dir}"        
+	
+        # 执行编译
+        echo -e "${CYAN}▶ 开始编译内核 (使用 $(nproc) 线程)...${NC}"
+        {
+            time make -j$(nproc) \
+                CFLAGS_KERNEL="${KERNEL_CFLAGS[$version]}" \
+                CFLAGS_MODULE="${MODULE_CFLAGS[$version]}" \
+                Image modules 2>&1 | tee "kernel_compile-${version}.log"
+        } 
+        if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+            echo -e "${RED}错误：内核编译失败！查看日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
+            exit 1
+        fi
 
-            echo -e "${CYAN}▶ 加载内核配置...${NC}"
-            #使用boards/board/kernel-build-version/kernel-build.conf中的kernel_config_manager的函数 设定特定内核参数
-            #kernel_config_manager .config
+        # 模块安装并记录详细日志
+        {
+            time make INSTALL_MOD_PATH="${modules_dir}" modules_install 2>&1 | tee "modules_install-${version}.log"
+        }
+        if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+            echo -e "${RED}✗ 模块安装失败！查看日志: ${kernel_src_dir}/modules_install-${version}.log${NC}"
+            exit 1
+        fi
 
-            if [[ -f "${kernel_custom_cfg_src}" ]]; then
-            	echo -e "${CYAN}▶ 应用自定义内核配置...${NC}"
-            	cp -vf "${kernel_custom_cfg_src}" "${kernel_cfg_dest}"
-            	echo -e "${GREEN}✓ 自定义内核配置完成${NC}"
-            else
-            	echo -e "${CYAN}▶ 应用kernel-build.conf内核配置...${NC}"
-            	cp -vf "${kernel_cfg_src}" "${kernel_cfg_dest}"
-            	kernel_config_manager .config
-            fi
-
-            touch "include/config.h"
-            make olddefconfig >/dev/null 2>&1
-            
-            # 强制模式时删除旧模块目录
-            if [[ "${KERNEL_MODE}" =~ only|force ]] && [[ -d "${modules_dir}" ]]; then
-                echo -e "${YELLOW}▶ 清理旧模块目录: ${modules_dir}${NC}"
-                rm -rf "${modules_dir}"
-            fi
-            
-            # 确保目录存在（自动创建）
-            mkdir -p "${modules_dir}"			
-
-            # 执行编译（启用ccache加速）
-            echo -e "${CYAN}▶ 开始编译内核 (使用 $(nproc) 线程)...${NC}"
-            if ! make -j$(nproc) \
-                CFLAGS_KERNEL="${CFLAGS_KERNEL}" \
-                CFLAGS_MODULE="${CFLAGS_MODULE}" \
-                Image modules ; then
-                echo -e "${RED}错误：内核编译失败！查看日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
-                exit 1
-            fi
-
-            if ! make INSTALL_MOD_PATH="${modules_dir}" modules_install; then
-            	echo -e "${RED}✗ 模块安装失败！查看日志: ${kernel_src_dir}/modules_install-${version}.log${NC}"
-            	exit 1
-            fi
-
-            {
-            	echo "==== 内核编译日志 ===="
-            	cat "kernel_compile-${version}.log"
-            	echo -e "\n\n==== 模块安装日志 ===="
-            	cat "modules_install-${version}.log"
-            } > "full_build_log-${version}.log"			
-
-            echo -e "${GREEN}✔ kernel-${version}编译成功！查看详细日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
-
-            mkdir -p "${BOARD_DIR}/build-out"
-            add_kread "arch/arm64/boot/Image" "${kernel_image}" || exit 1
+        # 生成完整日志文件（包含实时输出和时间统计）
+        {
+            echo "==== 内核编译日志 ===="
+            cat "kernel_compile-${version}.log"
+            echo -e "\n\n==== 模块安装日志 ===="
+            cat "modules_install-${version}.log"
+            echo -e "\n\n==== 时间统计 ===="
+            grep real *.log
+        } > "full_build_log-${version}.log"		
+        
+        echo -e "${GREEN}✔ kernel-${version}编译成功！查看详细日志: ${kernel_src_dir}/kernel_compile-${version}.log${NC}"
+        
+        mkdir -p "${BOARD_DIR}/build-out"
+        add_kread "arch/arm64/boot/Image" "${kernel_image}" || exit 1
 
         ) || exit 1
     done
@@ -1238,7 +1245,8 @@ compile_kernel() {
         echo -e "${YELLOW}⚠ 未找到任何内核文件${NC}"
     }
 
-    echo -e "\n${CYAN}模块目录状态：${NC}"
+    echo -e "\n${BLUE}✅ 所有模块编译安装完成：${NC}"
+	echo -e "输出目录: ${YELLOW}${BOARD_DIR}/build-out/${NC}"
     for version in "${!KERNEL_VERSIONS[@]}"; do
         ls -ld "${BOARD_DIR}/build-out/modules-${version}" 2>/dev/null || 
         echo -e "${YELLOW}⚠ 缺失模块目录: modules-${version}${NC}"
