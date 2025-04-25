@@ -75,7 +75,7 @@
 ```bash
 ./create_dom.sh dtb=force
 ```
-- 默认值dtb=auto, boards/[板型名称]/dts-qnap-*/dts修改后, 再次./create_dom.sh的时候, 如果boards/[板型名称]/build-out目录已经存在对应的dtb文件,不会重新编译dtb。
+- 默认值dtb=auto, boards/dts-files/默认配置rock-5c-rk3588s-emmc.dts修改后, 再次./create_dom.sh的时候, 如果boards/[板型名称]/build-out目录已经存在对应的dtb文件,不会重新编译dtb。
 - dtb=force时, boards/[板型名称]/build-out目录无论已经存在对应的dtb文件, 均重新编译dtb,最后打包整个固件。
 - ./create_dom.sh kernel=force
 - ./create_dom.sh uboot=force
