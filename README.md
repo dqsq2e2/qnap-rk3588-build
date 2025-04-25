@@ -298,11 +298,10 @@ https://github.com/armbian/linux-rockchip/blob/rk-5.10-rkr8/arch/arm64/boot/dts/
 
 down下来,复制到boards/roc-rk3588s-pc-emmc/board-org/目录备份
 同时删除掉boards/roc-rk3588s-pc-emmc/board-org/rock-5c-rk3588s.dts
-修改rk3588s-roc-pc.dts文件后复制进boards/roc-rk3588s-pc-emmc/dts-qnap-520/目录 以及dts-qnap-523/目录,
-同时删除里面的rock-5c-rk3588s.dts
+rk3588s-roc-pc.dts文件后复制进boards/dts-files/目录,修改如下
 
 ```diff
-diff --git a/boards/roc-rk3588s-pc-emmc/dts-qnap-510/rk3588s-roc-pc.dts b/boards/roc-rk3588s-pc-emmc/dts-qnap-510/rk3588s-roc-pc.dts
+diff --git a/boards/dts-files/rk3588s-roc-pc.dts b/boards/dts-files/rk3588s-roc-pc.dts
 index 111908a..f30d498 100644
 --- a/boards/roc-rk3588s-pc-emmc/dts-qnap-510/rk3588s-roc-pc.dts
 +++ b/boards/roc-rk3588s-pc-emmc/dts-qnap-510/rk3588s-roc-pc.dts
@@ -414,16 +413,16 @@ DTS_FILES="rk3588s-roc-pc"
 ```
  
  ### 6.内核适配 
- 分别修改boards/roc-rk3588s-pc-emmc/kernel-build-510/kernel-build.conf 以及kernel-build-520/kernel-build.conf
+ 分别修改boards/roc-rk3588s-pc-emmc/kernel-build-520/kernel-build.conf 以及kernel-build-523/kernel-build.conf
  删除其中的下列行,这是给rock-5c的aic8800的驱动编译的内核删除
  ```conf
         ["AIC8800-蓝牙wifi驱动"]="CONFIG_AIC_WLAN_SUPPORT=y\nCONFIG_AIC8800_WLAN_SUPPORT=m\nCONFIG_AIC_LOADFW_SUPPORT=m"
  ```
-删除boards/roc-rk3588s-pc-emmc/kernel-build-520/patchs 以及kernel-build-523/patchs目录中的对应的aic8800补丁文件
- ```txt
-0005-fix-add-aic-usb-blue.patch
-0006-add-usb-aic8800-wif-driver-org.patch
-0007-change-aic8800-firmware-patch-to-lib-firmware.patch
+删除kernel-build.conf中的PATCH_FILES中3行,是aic8800的蓝牙wifi驱动,rk3588s-roc-pc用不到,也可以不删.
+ ```conf
+			0005-fix-add-aic-usb-blue.patch
+			0006-add-usb-aic8800-wif-driver-org.patch
+			0007-change-aic8800-firmware-patch-to-lib-firmware.patch
  ```
 
 - kernel编译调试, 仅编译内核以及内核模块
