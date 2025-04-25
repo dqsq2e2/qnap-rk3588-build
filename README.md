@@ -130,107 +130,7 @@ https://www.t-firefly.com/product/industry/rocrk3588spc
 cp -ar boards/rock-5c-rk3588s-emmc boards/roc-rk3588s-pc-emmc
 rm -rf boards/roc-rk3588s-pc-emmc/build-out
 ```
-
-### 3.修正qnap的qts系统补丁,目录boards/roc-rk3588s-pc-emmc/patch/
-
-ROC-RK3588S-PC 的linux启动,启动前自行修改dtb中的M2接口
-
-```bash
-apt install hwinfo
-hwinfo --disk
-hwinfo --netcard
-``` 
-```log
-13: PCI 00.0: 10600 Disk                                    
-  SysFS ID: /class/block/nvme0n1
-  SysFS BusID: nvme0
-  SysFS Device Link: /devices/platform/fe190000.pcie/pci0004:40/0004:40:00.0/0004:41:00.0/nvme/nvme0
-  Driver: "nvme"
-  Driver Modules: "nvme"
-  Device File: /dev/nvme0n1
-  Device Files: /dev/nvme0n1, /dev/disk/by-id/nvme-YMTC_PC210-512GB-D_YMA1512JA212100802, /dev/disk/by-path/platform-fe190000.pcie-pci-0004:41:00.0-nvme-1, /dev/disk/by-id/nvme-YMTC_PC210-512GB-D_YMA1512JA212100802_1, /dev/disk/by-id/nvme-eui.a428b72aaafb0049  
-  Attached to: #1 (Non-Volatile memory controller)
-
-  #M2接口信息
-
-15: None 00.0: 10600 Disk
-  SysFS ID: /class/block/mmcblk0
-  SysFS BusID: mmc0:0001
-  SysFS Device Link: /devices/platform/fe2e0000.mmc/mmc_host/mmc0/mmc0:0001
-  Hardware Class: disk
-  Model: "Disk"
-  Driver: "sdhci-dwcmshc", "mmcblk"
-  Device File: /dev/mmcblk0
-  Device Files: /dev/mmcblk0, /dev/disk/by-id/mmc-CJTD4R_0xa13cbc38, /dev/disk/by-path/platform-fe2e0000.mmc
-
-  #emmc信息
-
-16: None 00.0: 10600 Disk
-  SysFS ID: /class/block/mmcblk1
-  SysFS Device Link: /devices/platform/fe2c0000.mmc/mmc_host/mmc1/mmc1:b36d
-  Hardware Class: disk
-  Model: "Disk"
-  Driver: "dwmmc_rockchip", "mmcblk"
-  Device File: /dev/mmcblk1
-  Device Files: /dev/mmcblk1, /dev/disk/by-path/platform-fe2c0000.mmc, /dev/disk/by-id/mmc-SDABC_0xaa000b59
-
-#sd卡信息
-
-05: None 00.0: 0200 Ethernet controller
-  [Created at pci.1030]
-  Unique ID: B7sH.TfPFe67fIBB
-  SysFS ID: /devices/platform/fe1c0000.ethernet
-  SysFS BusID: fe1c0000.ethernet
-  Hardware Class: network
-
-#网卡信息
-
-```
-
-- 修改boards/roc-rk3588s-pc-emmc/patch/etc/model.conf
-```conf
-[System Disk 1]
-DEV_DOMAIN = 4
-DEV_BUS = B64:D00:F0
-DEV_BRIDGE_BUS = B65:D00:F0
-DEV_PORT = 3
-SLOT_NAME = Disk 1
-[System Disk 2]
-DEV_DOMAIN = 4
-DEV_BUS = B64:D00:F0
-DEV_BRIDGE_BUS = B65:D00:F0
-DEV_PORT = 2
-SLOT_NAME = Disk 2
-************
-
-[System Network 1]
-DEV_BUS = B-1:fe1c0000.ethernet
-DEV_PORT = 0
-NIC_NAME = ARM Cortex 64-bit Processor GbE
-
-[Boot Disk 1]
-DISK_DRV_TYPE = MMC
-DEV_BUS = B-1:fe2e0000.mmc
-BOOT_RECOVERY_MODE=2
-```
-这里跟rock-5c完全一致,不需要修正,如果不一致,修改具体见nanyun论坛我的帖子,跟x86类似
-usb 写法也类似,自行修正
-
-- 修改boards/roc-rk3588s-pc-emmc/patch/sbin/patch,删除如下内容
-
-移除不需要的rokc-5c驱动补丁（如蓝牙/WiFi驱动）
-```txt
-	if [ $(fw_printenv -n qnap_kernel_version) -lt 521 ]; then
-		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/uhid.ko
-		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/aic_btusb.ko
-		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/aic_load_fw.ko
-	else
-		/sbin/insmod /lib/modules/5.10.60-qnap/uhid.ko
-		/sbin/insmod /lib/modules/5.10.60-qnap/aic_btusb.ko
-		/sbin/insmod /lib/modules/5.10.60-qnap/aic_load_fw.ko
-	fi	
-```
-### 4.uboot适配
+### 3.uboot适配
 查看u-boot/u-boot-qnap/configs/目录 并没有rk3588s-roc-pc相关的defconfig, 可以去如下网址下载uboot补丁
 
 https://github.com/Joshua-Riek/ubuntu-rockchip/tree/main/packages/u-boot-radxa-rk3588/debian/patches
@@ -288,7 +188,7 @@ UBOOT_CONFIG="rk3588"
 ./create_dom.sh uboot=only
 ```
  
- ### 5.dts适配
+ ### 4.dts适配
  获取ROC-RK3588S-PC的5.10内核的dts, 可以在firefly官网的下载linux sdk获取, 但是比较繁琐
 这里直接从Joshua-Riek的Ubuntu获取
 https://github.com/Joshua-Riek/linux-rockchip/blob/jammy/arch/arm64/boot/dts/rockchip/rk3588s-roc-pc.dts
@@ -298,7 +198,7 @@ https://github.com/armbian/linux-rockchip/blob/rk-5.10-rkr8/arch/arm64/boot/dts/
 
 down下来,复制到boards/roc-rk3588s-pc-emmc/board-org/目录备份
 同时删除掉boards/roc-rk3588s-pc-emmc/board-org/rock-5c-rk3588s.dts
-rk3588s-roc-pc.dts文件后复制进boards/dts-files/目录,修改如下
+rk3588s-roc-pc.dts文件复制进boards/dts-files/目录,同时修改如下
 
 ```diff
 diff --git a/boards/dts-files/rk3588s-roc-pc.dts b/boards/dts-files/rk3588s-roc-pc.dts
@@ -412,7 +312,7 @@ DTS_FILES="rk3588s-roc-pc"
 ./create_dom.sh dtb=only
 ```
  
- ### 6.内核适配 
+ ### 5.内核适配 
  分别修改boards/roc-rk3588s-pc-emmc/kernel-build-520/kernel-build.conf 以及kernel-build-523/kernel-build.conf
  删除其中的下列行,这是给rock-5c的aic8800的驱动编译的内核删除
  ```conf
@@ -431,6 +331,106 @@ DTS_FILES="rk3588s-roc-pc"
 ```
 
 调试完成后 将boards/roc-rk3588s-pc-emmc/build-out/modules-523/中需要的相关内核模块 自行复制 进boards/roc-rk3588s-pc-emmc/patch/lib/modules/5.10.60-qnap/目录,并自行处理boards/roc-rk3588s-pc-emmc/patch/sbin/patch 相关内核模块挂载点
+
+### 6.修正qnap的qts系统补丁,目录boards/roc-rk3588s-pc-emmc/patch/
+
+ROC-RK3588S-PC 的linux启动,启动前自行修改dtb中的M2接口
+
+```bash
+apt install hwinfo
+hwinfo --disk
+hwinfo --netcard
+``` 
+```log
+13: PCI 00.0: 10600 Disk                                    
+  SysFS ID: /class/block/nvme0n1
+  SysFS BusID: nvme0
+  SysFS Device Link: /devices/platform/fe190000.pcie/pci0004:40/0004:40:00.0/0004:41:00.0/nvme/nvme0
+  Driver: "nvme"
+  Driver Modules: "nvme"
+  Device File: /dev/nvme0n1
+  Device Files: /dev/nvme0n1, /dev/disk/by-id/nvme-YMTC_PC210-512GB-D_YMA1512JA212100802, /dev/disk/by-path/platform-fe190000.pcie-pci-0004:41:00.0-nvme-1, /dev/disk/by-id/nvme-YMTC_PC210-512GB-D_YMA1512JA212100802_1, /dev/disk/by-id/nvme-eui.a428b72aaafb0049  
+  Attached to: #1 (Non-Volatile memory controller)
+
+  #M2接口信息
+
+15: None 00.0: 10600 Disk
+  SysFS ID: /class/block/mmcblk0
+  SysFS BusID: mmc0:0001
+  SysFS Device Link: /devices/platform/fe2e0000.mmc/mmc_host/mmc0/mmc0:0001
+  Hardware Class: disk
+  Model: "Disk"
+  Driver: "sdhci-dwcmshc", "mmcblk"
+  Device File: /dev/mmcblk0
+  Device Files: /dev/mmcblk0, /dev/disk/by-id/mmc-CJTD4R_0xa13cbc38, /dev/disk/by-path/platform-fe2e0000.mmc
+
+  #emmc信息
+
+16: None 00.0: 10600 Disk
+  SysFS ID: /class/block/mmcblk1
+  SysFS Device Link: /devices/platform/fe2c0000.mmc/mmc_host/mmc1/mmc1:b36d
+  Hardware Class: disk
+  Model: "Disk"
+  Driver: "dwmmc_rockchip", "mmcblk"
+  Device File: /dev/mmcblk1
+  Device Files: /dev/mmcblk1, /dev/disk/by-path/platform-fe2c0000.mmc, /dev/disk/by-id/mmc-SDABC_0xaa000b59
+
+#sd卡信息
+
+05: None 00.0: 0200 Ethernet controller
+  [Created at pci.1030]
+  Unique ID: B7sH.TfPFe67fIBB
+  SysFS ID: /devices/platform/fe1c0000.ethernet
+  SysFS BusID: fe1c0000.ethernet
+  Hardware Class: network
+
+#网卡信息
+
+```
+
+- 修改boards/roc-rk3588s-pc-emmc/patch/etc/model.conf
+```conf
+[System Disk 1]
+DEV_DOMAIN = 4
+DEV_BUS = B64:D00:F0
+DEV_BRIDGE_BUS = B65:D00:F0
+DEV_PORT = 3
+SLOT_NAME = Disk 1
+[System Disk 2]
+DEV_DOMAIN = 4
+DEV_BUS = B64:D00:F0
+DEV_BRIDGE_BUS = B65:D00:F0
+DEV_PORT = 2
+SLOT_NAME = Disk 2
+************
+
+[System Network 1]
+DEV_BUS = B-1:fe1c0000.ethernet
+DEV_PORT = 0
+NIC_NAME = ARM Cortex 64-bit Processor GbE
+
+[Boot Disk 1]
+DISK_DRV_TYPE = MMC
+DEV_BUS = B-1:fe2e0000.mmc
+BOOT_RECOVERY_MODE=2
+```
+这里跟rock-5c完全一致,不需要修正,如果不一致,修改具体见nanyun论坛我的帖子,跟x86类似
+usb 写法也类似,自行修正
+
+- 修改boards/roc-rk3588s-pc-emmc/patch/sbin/patch,删除如下内容
+
+移除不需要的rokc-5c驱动补丁（如蓝牙/WiFi驱动）
+```txt
+	if [ $(fw_printenv -n qnap_kernel_version) -lt 521 ]; then
+		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/uhid.ko
+		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/aic_btusb.ko
+		/sbin/insmod /lib/modules/5.10.60-qnap/5.1.x/aic_load_fw.ko
+	else
+		/sbin/insmod /lib/modules/5.10.60-qnap/uhid.ko
+		/sbin/insmod /lib/modules/5.10.60-qnap/aic_btusb.ko
+		/sbin/insmod /lib/modules/5.10.60-qnap/aic_load_fw.ko
+	fi	
+```
 
  ### 7.回到qnap-build主目录执行编译指令
  ```bash
