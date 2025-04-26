@@ -51,8 +51,7 @@
 │       └── custom.conf    # 板级配置文件
 ├── qnap-tools/            # qnap PC1以及源码
 ├── u-boot/                # U-Boot源码
-├── qnap-kernel-config/    # qnap 内核版本patch
-├── qnap-kernel/           # 自动创建,qnap内核源码
+├── qnap-kernel/           # qnap 内核源码相关
 ├── qnap-firmware/         # 自动创建,qnap官方固件
 ├── build_logs/            # 自动创建,构建日志存储
 └── 板型名称-版本号-日期.zip  # 最终输出构建压缩文件
@@ -312,16 +311,16 @@ DTS_FILES="rk3588s-roc-pc"
 ```
  
  ### 5.内核适配 
- 分别修改boards/roc-rk3588s-pc-emmc/kernel-build-520/kernel-build.conf 以及kernel-build-523/kernel-build.conf
- 删除其中的下列行,这是给rock-5c的aic8800的驱动编译的内核删除
+ 分别修改boards/roc-rk3588s-pc-emmc/custom.conf
+ 删除config_matrix其中的下列行,这是给rock-5c的aic8800的驱动编译的内核删除
  ```conf
         ["AIC8800-蓝牙wifi驱动"]="CONFIG_AIC_WLAN_SUPPORT=y\nCONFIG_AIC8800_WLAN_SUPPORT=m\nCONFIG_AIC_LOADFW_SUPPORT=m"
  ```
-删除kernel-build.conf中的PATCH_FILES中3行,是aic8800的蓝牙wifi驱动,rk3588s-roc-pc用不到,也可以不删.
+删除COMMON_510_KERNEL_PATCH_SET中3行,是aic8800的蓝牙wifi驱动,rk3588s-roc-pc用不到,也可以不删.
  ```conf
-			0005-fix-add-aic-usb-blue.patch
-			0006-add-usb-aic8800-wif-driver-org.patch
-			0007-change-aic8800-firmware-patch-to-lib-firmware.patch
+		0005-fix-add-aic-usb-blue.patch
+		0006-add-usb-aic8800-wif-driver-org.patch
+		0007-change-aic8800-firmware-patch-to-lib-firmware.patch
  ```
 
 - kernel编译调试, 仅编译内核以及内核模块
