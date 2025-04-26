@@ -46,7 +46,6 @@
 │   ├── qnap_build.conf    # 主构建配置文件
 │   ├── dts-files          # 各版型设备树文件
 │   └── [板型名称]/         # 各设备独立配置
-│       ├── kernel-build-* # 内核构建配置
 │       ├── patch/         # qts系统补丁文件
 │       ├── build-out/     # 自动创建,构建过程文件
 │       └── custom.conf    # 板级配置文件

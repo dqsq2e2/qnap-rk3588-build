@@ -918,7 +918,7 @@ compile_dtb() {
         fi
 
         # ==================== 新增补丁处理步骤 ====================
-        local patch_dir="${SRC}/qnap-kernel-config/kernel-patchs-${version}"
+        local patch_dir="${SRC}/qnap-kernel/kernel-patchs-${version}"
         # 修复数组引用方式（移除eval）
         local DTB_PATCH_FILES=(${DTB_PATCH_SET[$version]})
         echo "Valid patches for $version: ${DTB_PATCH_FILES[@]} in ${patch_dir}"
@@ -1134,7 +1134,7 @@ compile_kernel() {
             cd "${kernel_src_dir}" || exit 1
 			
         # ==================== 修正补丁处理 ====================
-        local patch_dir="${SRC}/qnap-kernel-config/kernel-patchs-${version}"
+        local patch_dir="${SRC}/qnap-kernel/kernel-patchs-${version}"
         # 使用KERNEL_PATCH_SET代替PATCH_FILES
         local KERNEL_PATCH_FILES=(${KERNEL_PATCH_SET[$version]})
         echo "Valid kernel patches for $version: ${KERNEL_PATCH_FILES[@]} in ${patch_dir}"
