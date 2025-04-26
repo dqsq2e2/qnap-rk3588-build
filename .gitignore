@@ -1,7 +1,15 @@
 qnap-firmware/**
-qnap-kernel/**
 boards/*/build-out/
 *.zip
 *.img
 build_logs/
 qnap-tools/tmp/
+/tmp/  # 忽略根目录下的tmp目录
+# 忽略 qnap-kernel 目录下所有内容
+qnap-kernel/**
+# 白名单：跟踪 kernel-patchs- 开头的目录及其内容
+!qnap-kernel/kernel-patchs-*/
+!qnap-kernel/kernel-patchs-*/**
+# 特别排除隐藏文件和临时文件（可选）
+qnap-kernel/**/.*
+qnap-kernel/**/*~
