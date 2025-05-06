@@ -928,7 +928,8 @@ compile_dtb() {
             
             (
                 cd "${kernel_src_dir}" || exit 1
-                for patch_name in ${DTB_PATCH_FILES}; do
+                # 修复循环方式（使用数组展开）
+                for patch_name in "${DTB_PATCH_FILES[@]}"; do
                     patch="${patch_dir}/${patch_name}"
                     if [[ -f "${patch}" ]]; then
                         echo -e "应用补丁: ${YELLOW}${patch_name}${NC}"

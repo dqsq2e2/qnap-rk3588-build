@@ -1,0 +1,39 @@
+From 15a9f5b9ab03eaf2083c8f8c9b66f2990922af01 Mon Sep 17 00:00:00 2001
+From: R-mt <wxzmz@163.com>
+Date: Wed, 7 May 2025 01:03:35 +0800
+Subject: [PATCH] add firefly-itx-3588j pca pinctrl
+
+---
+ include/dt-bindings/pinctrl/rockchip.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/include/dt-bindings/pinctrl/rockchip.h b/include/dt-bindings/pinctrl/rockchip.h
+index c7815372e..f95673df2 100644
+--- a/include/dt-bindings/pinctrl/rockchip.h
++++ b/include/dt-bindings/pinctrl/rockchip.h
+@@ -76,4 +76,22 @@
+ #define RK_FUNC_14	14
+ #define RK_FUNC_15	15
+ 
++#define PCA_IO0_0          0
++#define PCA_IO0_1          1
++#define PCA_IO0_2          2
++#define PCA_IO0_3          3
++#define PCA_IO0_4          4
++#define PCA_IO0_5          5
++#define PCA_IO0_6          6
++#define PCA_IO0_7          7
++#define PCA_IO1_0          8
++#define PCA_IO1_1          9
++#define PCA_IO1_2          10
++#define PCA_IO1_3          11
++#define PCA_IO1_4          12
++#define PCA_IO1_5          13
++#define PCA_IO1_6          14
++#define PCA_IO1_7          15
++
++
+ #endif
+-- 
+2.34.1
+
