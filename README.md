@@ -22,6 +22,8 @@
 |-------------------|--------------|----------|------------|
 | `rock-5c-rk3588s` | Rockchip RK3588S | eMMC/SD | ✅ 完全支持 |
 | `orangepi_5_plus` | Rockchip RK3588 | eMMC/SD  | ✅ 完全支持 |
+| `roc-rk3588s-pc` | Rockchip RK3588 | eMMC  | ✅ 完全支持 |
+| `firefly-itx-3588j` | Rockchip RK3588 | eMMC  | ✅ 完全支持 |
 
 > 提示：可通过修改 `qnap_build.conf` 扩展新设备支持
 
