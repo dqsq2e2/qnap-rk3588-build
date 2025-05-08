@@ -1,0 +1,4442 @@
+From bed6ed33fbbf77fc618b0b89c68d3d87c6c7378e Mon Sep 17 00:00:00 2001
+From: wxzmz <wuxic8810@gmail.com>
+Date: Sat, 23 Nov 2024 19:08:11 +0800
+Subject: [PATCH] add itx-rk3588 pcie wifi driver pcie patch
+
+---
+ drivers/gpio/Kconfig                |  19 ++
+ drivers/gpio/Makefile               |   3 +
+ drivers/gpio/gpio-firefly-gl3321g.c | 102 +++++++
+ drivers/gpio/gpio-firefly.c         | 136 ++++++++++
+ drivers/gpio/gpio-max96752f.c       | 104 ++++++++
+ drivers/gpio/gpio-mvebu.c           |  38 ---
+ drivers/gpio/gpio-pca953x.c         |   6 +
+ drivers/gpio/gpiolib-of.c           |  11 +
+ drivers/gpio/gpiolib-of.h           |   5 +
+ drivers/gpio/gpiolib.c              |  71 ++++-
+ drivers/pci/controller/dwc/Kconfig  |   8 +
+ drivers/pci/pcie/Kconfig            |   6 +
+ drivers/pci/pcie/Makefile           |   1 +
+ drivers/pci/pcie/aspm_ext.c         | 339 ++++++++++++++++++++++++
+ drivers/soc/rockchip/iomux.c        |  87 ++++++
+ include/linux/gpio/driver.h         |  10 +
+ include/linux/phy/pcie.h            |  12 +
+ include/trace/hooks/avc.h           |  33 +++
+ include/trace/hooks/binder.h        |  87 ++++++
+ include/trace/hooks/block.h         |  30 +++
+ include/trace/hooks/bug.h           |  22 ++
+ include/trace/hooks/cgroup.h        |  32 +++
+ include/trace/hooks/cpu.h           |  25 ++
+ include/trace/hooks/cpufreq.h       |  53 ++++
+ include/trace/hooks/cpuidle.h       |  27 ++
+ include/trace/hooks/cpuidle_psci.h  |  25 ++
+ include/trace/hooks/creds.h         |  34 +++
+ include/trace/hooks/debug.h         |  26 ++
+ include/trace/hooks/dtask.h         |  62 +++++
+ include/trace/hooks/epoch.h         |  25 ++
+ include/trace/hooks/fault.h         |  36 +++
+ include/trace/hooks/fips140.h       |  51 ++++
+ include/trace/hooks/fpsimd.h        |  23 ++
+ include/trace/hooks/fs.h            |  23 ++
+ include/trace/hooks/ftrace_dump.h   |  40 +++
+ include/trace/hooks/futex.h         |  25 ++
+ include/trace/hooks/gic.h           |  22 ++
+ include/trace/hooks/gic_v3.h        |  28 ++
+ include/trace/hooks/gpiolib.h       |  24 ++
+ include/trace/hooks/hung_task.h     |  24 ++
+ include/trace/hooks/i2c.h           |  20 ++
+ include/trace/hooks/iommu.h         |  41 +++
+ include/trace/hooks/ipv4.h          |  34 +++
+ include/trace/hooks/ipv6.h          |  22 ++
+ include/trace/hooks/logbuf.h        |  26 ++
+ include/trace/hooks/memory.h        |  32 +++
+ include/trace/hooks/mm.h            | 134 ++++++++++
+ include/trace/hooks/mmc_core.h      |  40 +++
+ include/trace/hooks/module.h        |  25 ++
+ include/trace/hooks/net.h           |  36 +++
+ include/trace/hooks/pci.h           |  22 ++
+ include/trace/hooks/pm_domain.h     |  24 ++
+ include/trace/hooks/power.h         |  44 +++
+ include/trace/hooks/preemptirq.h    |  34 +++
+ include/trace/hooks/printk.h        |  21 ++
+ include/trace/hooks/psi.h           |  33 +++
+ include/trace/hooks/remoteproc.h    |  27 ++
+ include/trace/hooks/rwsem.h         |  37 +++
+ include/trace/hooks/sched.h         | 397 ++++++++++++++++++++++++++++
+ include/trace/hooks/scmi.h          |  19 ++
+ include/trace/hooks/selinux.h       |  21 ++
+ include/trace/hooks/shmem_fs.h      |  17 ++
+ include/trace/hooks/signal.h        |  20 ++
+ include/trace/hooks/snd_compr.h     |  25 ++
+ include/trace/hooks/softlockup.h    |  23 ++
+ include/trace/hooks/sound.h         |  24 ++
+ include/trace/hooks/sys.h           |  17 ++
+ include/trace/hooks/syscall_check.h |  31 +++
+ include/trace/hooks/sysrqcrash.h    |  22 ++
+ include/trace/hooks/thermal.h       |  25 ++
+ include/trace/hooks/timer.h         |  19 ++
+ include/trace/hooks/topology.h      |  27 ++
+ include/trace/hooks/traps.h         |  42 +++
+ include/trace/hooks/typec.h         |  67 +++++
+ include/trace/hooks/ufshcd.h        |  71 +++++
+ include/trace/hooks/usb.h           |  27 ++
+ include/trace/hooks/user.h          |  23 ++
+ include/trace/hooks/v4l2core.h      |  65 +++++
+ include/trace/hooks/v4l2mc.h        |  27 ++
+ include/trace/hooks/vendor_hooks.h  | 114 ++++++++
+ include/trace/hooks/vmscan.h        |  33 +++
+ include/trace/hooks/workqueue.h     |  22 ++
+ include/trace/hooks/wqlockup.h      |  22 ++
+ include/uapi/linux/rk-iomux.h       |  20 ++
+ 85 files changed, 3565 insertions(+), 48 deletions(-)
+ create mode 100644 drivers/gpio/gpio-firefly-gl3321g.c
+ create mode 100644 drivers/gpio/gpio-firefly.c
+ create mode 100644 drivers/gpio/gpio-max96752f.c
+ create mode 100644 drivers/pci/pcie/aspm_ext.c
+ create mode 100644 drivers/soc/rockchip/iomux.c
+ create mode 100644 include/linux/phy/pcie.h
+ create mode 100644 include/trace/hooks/avc.h
+ create mode 100644 include/trace/hooks/binder.h
+ create mode 100644 include/trace/hooks/block.h
+ create mode 100644 include/trace/hooks/bug.h
+ create mode 100644 include/trace/hooks/cgroup.h
+ create mode 100644 include/trace/hooks/cpu.h
+ create mode 100644 include/trace/hooks/cpufreq.h
+ create mode 100644 include/trace/hooks/cpuidle.h
+ create mode 100644 include/trace/hooks/cpuidle_psci.h
+ create mode 100644 include/trace/hooks/creds.h
+ create mode 100644 include/trace/hooks/debug.h
+ create mode 100644 include/trace/hooks/dtask.h
+ create mode 100644 include/trace/hooks/epoch.h
+ create mode 100644 include/trace/hooks/fault.h
+ create mode 100644 include/trace/hooks/fips140.h
+ create mode 100644 include/trace/hooks/fpsimd.h
+ create mode 100644 include/trace/hooks/fs.h
+ create mode 100644 include/trace/hooks/ftrace_dump.h
+ create mode 100644 include/trace/hooks/futex.h
+ create mode 100644 include/trace/hooks/gic.h
+ create mode 100644 include/trace/hooks/gic_v3.h
+ create mode 100644 include/trace/hooks/gpiolib.h
+ create mode 100644 include/trace/hooks/hung_task.h
+ create mode 100644 include/trace/hooks/i2c.h
+ create mode 100644 include/trace/hooks/iommu.h
+ create mode 100644 include/trace/hooks/ipv4.h
+ create mode 100644 include/trace/hooks/ipv6.h
+ create mode 100644 include/trace/hooks/logbuf.h
+ create mode 100644 include/trace/hooks/memory.h
+ create mode 100644 include/trace/hooks/mm.h
+ create mode 100644 include/trace/hooks/mmc_core.h
+ create mode 100644 include/trace/hooks/module.h
+ create mode 100644 include/trace/hooks/net.h
+ create mode 100644 include/trace/hooks/pci.h
+ create mode 100644 include/trace/hooks/pm_domain.h
+ create mode 100644 include/trace/hooks/power.h
+ create mode 100644 include/trace/hooks/preemptirq.h
+ create mode 100644 include/trace/hooks/printk.h
+ create mode 100644 include/trace/hooks/psi.h
+ create mode 100644 include/trace/hooks/remoteproc.h
+ create mode 100644 include/trace/hooks/rwsem.h
+ create mode 100644 include/trace/hooks/sched.h
+ create mode 100644 include/trace/hooks/scmi.h
+ create mode 100644 include/trace/hooks/selinux.h
+ create mode 100644 include/trace/hooks/shmem_fs.h
+ create mode 100644 include/trace/hooks/signal.h
+ create mode 100644 include/trace/hooks/snd_compr.h
+ create mode 100644 include/trace/hooks/softlockup.h
+ create mode 100644 include/trace/hooks/sound.h
+ create mode 100644 include/trace/hooks/sys.h
+ create mode 100644 include/trace/hooks/syscall_check.h
+ create mode 100644 include/trace/hooks/sysrqcrash.h
+ create mode 100644 include/trace/hooks/thermal.h
+ create mode 100644 include/trace/hooks/timer.h
+ create mode 100644 include/trace/hooks/topology.h
+ create mode 100644 include/trace/hooks/traps.h
+ create mode 100644 include/trace/hooks/typec.h
+ create mode 100644 include/trace/hooks/ufshcd.h
+ create mode 100644 include/trace/hooks/usb.h
+ create mode 100644 include/trace/hooks/user.h
+ create mode 100644 include/trace/hooks/v4l2core.h
+ create mode 100644 include/trace/hooks/v4l2mc.h
+ create mode 100644 include/trace/hooks/vendor_hooks.h
+ create mode 100644 include/trace/hooks/vmscan.h
+ create mode 100644 include/trace/hooks/workqueue.h
+ create mode 100644 include/trace/hooks/wqlockup.h
+ create mode 100644 include/uapi/linux/rk-iomux.h
+
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 9a4110ad1..a0554831c 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -1235,6 +1235,13 @@ config GPIO_MAX77650
+ 	  GPIO driver for MAX77650/77651 PMIC from Maxim Semiconductor.
+ 	  These chips have a single pin that can be configured as GPIO.
+ 
++config GPIO_MAX96752F
++	tristate "MAX96752F GPIO"
++	depends on MFD_MAX96752F
++	help
++	  Select this option to enable GPIO driver for the MAX96752F
++	  chip.
++
+ config GPIO_MSIC
+ 	bool "Intel MSIC mixed signal gpio support"
+ 	depends on (X86 || COMPILE_TEST) && MFD_INTEL_MSIC
+@@ -1602,6 +1609,18 @@ config GPIO_VIPERBOARD
+ 
+ endmenu
+ 
++config GPIO_FIREFLY_GL3321G
++	tristate "Firefly GL3321G GPIO driver support"
++	default y
++	help
++	  Sample code of gpio
++
++config GPIO_FIREFLY
++	tristate "Firefly GPIO Demo support"
++	default y
++	help
++	  Sample code of gpio.
++
+ config GPIO_AGGREGATOR
+ 	tristate "GPIO Aggregator"
+ 	help
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index ce6cafb6d..67dc862e4 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -88,6 +88,7 @@ obj-$(CONFIG_GPIO_MAX730X)		+= gpio-max730x.o
+ obj-$(CONFIG_GPIO_MAX732X)		+= gpio-max732x.o
+ obj-$(CONFIG_GPIO_MAX77620)		+= gpio-max77620.o
+ obj-$(CONFIG_GPIO_MAX77650)		+= gpio-max77650.o
++obj-$(CONFIG_GPIO_MAX96752F)		+= gpio-max96752f.o
+ obj-$(CONFIG_GPIO_MB86S7X)		+= gpio-mb86s7x.o
+ obj-$(CONFIG_GPIO_MC33880)		+= gpio-mc33880.o
+ obj-$(CONFIG_GPIO_MC9S08DZ60)		+= gpio-mc9s08dz60.o
+@@ -181,3 +182,5 @@ obj-$(CONFIG_GPIO_XTENSA)		+= gpio-xtensa.o
+ obj-$(CONFIG_GPIO_ZEVIO)		+= gpio-zevio.o
+ obj-$(CONFIG_GPIO_ZX)			+= gpio-zx.o
+ obj-$(CONFIG_GPIO_ZYNQ)			+= gpio-zynq.o
++obj-$(CONFIG_GPIO_FIREFLY_GL3321G)  += gpio-firefly-gl3321g.o
++obj-$(CONFIG_GPIO_FIREFLY)      += gpio-firefly.o
+diff --git a/drivers/gpio/gpio-firefly-gl3321g.c b/drivers/gpio/gpio-firefly-gl3321g.c
+new file mode 100644
+index 000000000..19b34021f
+--- /dev/null
++++ b/drivers/gpio/gpio-firefly-gl3321g.c
+@@ -0,0 +1,102 @@
++/*
++ * Driver for Firefly board.
++ *
++ * Copyright (C) 2016, Zhongshan T-chip Intelligent Technology Co.,ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
++#include <linux/delay.h>
++
++
++struct firefly_gpio_info {
++	struct gpio_desc* firefly_gpiod;
++};
++
++
++
++static int firefly_gl3321g_gpio_probe(struct platform_device *pdev)
++{
++    int ret;
++	int time;
++    struct firefly_gpio_info *gpio_info;
++    struct device_node *firefly_gpio_node = pdev->dev.of_node;
++
++	gpio_info = devm_kzalloc(&pdev->dev,sizeof(struct firefly_gpio_info), GFP_KERNEL);
++    if (!gpio_info) {
++        dev_err(&pdev->dev, "devm_kzalloc failed!\n");
++                return -ENOMEM;
++    }
++
++	gpio_info->firefly_gpiod = devm_gpiod_get_optional(&pdev->dev, "firefly-gl3321g", GPIOD_OUT_LOW);
++    if (IS_ERR(gpio_info->firefly_gpiod)) {
++        dev_err(&pdev->dev, "failed to get firefly gpio\n");
++		return -ENODEV;
++    }
++	pdev->dev.driver_data = gpio_info;
++    ret=of_property_read_u32(firefly_gpio_node,"firefly-mdelay",&time);
++	if(!ret && (time > 0)){
++		printk("firefly gl3321g gpio delay %d ms\n",time);
++		msleep(time);
++	}
++	printk("firefly gl3321g gpio set high\n");
++	gpiod_set_value_cansleep(gpio_info->firefly_gpiod, 1);
++
++	return 0;
++}
++
++static void firefly_gl3321g_gpio_shutdown(struct platform_device *pdev)
++{
++/*
++	struct firefly_gpio_info *gpio_info;
++	gpio_info = pdev->dev.driver_data;
++	if(gpio_info != NULL)
++		gpiod_set_value_cansleep(gpio_info->firefly_gpiod,0);
++
++	printk("firefly gl3321g gpio set low\n");
++*/
++	return;
++}
++
++static struct of_device_id firefly_match_table[] = {
++        { .compatible = "firefly,gl3321g-gpio",},
++        {},
++};
++
++static struct platform_driver firefly_gl3321g_gpio_driver = {
++        .driver = {
++                .name = "gl3321g-gpio",
++                .owner = THIS_MODULE,
++                .of_match_table = firefly_match_table,
++        },
++        .probe = firefly_gl3321g_gpio_probe,
++		.shutdown = firefly_gl3321g_gpio_shutdown,
++};
++
++static int firefly_gl3321g_gpio_init(void)
++{
++        return platform_driver_register(&firefly_gl3321g_gpio_driver);
++}
++late_initcall(firefly_gl3321g_gpio_init);
++
++static void firefly_gl3321g_gpio_exit(void)
++{
++        platform_driver_unregister(&firefly_gl3321g_gpio_driver);
++}
++module_exit(firefly_gl3321g_gpio_exit);
++
++MODULE_AUTHOR("zyk <zyk@t-chip.com.cn>");
++MODULE_DESCRIPTION("Firefly GL3321G GPIO driver");
++MODULE_ALIAS("platform:firefly-gl3321g-gpio");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/gpio/gpio-firefly.c b/drivers/gpio/gpio-firefly.c
+new file mode 100644
+index 000000000..c63fc9a7a
+--- /dev/null
++++ b/drivers/gpio/gpio-firefly.c
+@@ -0,0 +1,136 @@
++/*
++ * Driver for pwm demo on Firefly board.
++ *
++ * Copyright (C) 2016, Zhongshan T-chip Intelligent Technology Co.,ltd.
++ * Copyright 2006  JC.Lin
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h> /* for enum gpiod_flags */
++
++struct firefly_gpio_info {
++    int firefly_gpio;
++    int gpio_enable_value;
++    int firefly_irq_gpio;
++    int firefly_irq;
++    int firefly_irq_mode;
++};
++
++static irqreturn_t firefly_gpio_irq(int irq, void *dev_id)
++{
++    printk("Enter firefly gpio irq test program!\n");
++    return IRQ_HANDLED;
++}
++
++static int firefly_gpio_probe(struct platform_device *pdev)
++{
++    int ret;
++    int gpio;
++    enum of_gpio_flags flag;
++    struct firefly_gpio_info *gpio_info;
++    struct device_node *firefly_gpio_node = pdev->dev.of_node;
++
++    printk("Firefly GPIO Test Program Probe\n");
++	gpio_info = devm_kzalloc(&pdev->dev,sizeof(struct firefly_gpio_info), GFP_KERNEL);
++    if (!gpio_info) {
++        dev_err(&pdev->dev, "devm_kzalloc failed!\n");
++        return -ENOMEM;
++    }
++    gpio = of_get_named_gpio_flags(firefly_gpio_node, "firefly-gpio", 0, &flag);
++    if (!gpio_is_valid(gpio))
++    {
++        dev_err(&pdev->dev, "firefly-gpio: %d is invalid\n", gpio);
++        return -ENODEV;
++    }
++    if (gpio_request(gpio, "firefly-gpio"))
++    {
++        dev_err(&pdev->dev, "firefly-gpio: %d request failed!\n", gpio);
++        gpio_free(gpio);
++        return -ENODEV;
++    }
++    gpio_info->firefly_gpio = gpio;
++    gpio_info->gpio_enable_value = (flag == OF_GPIO_ACTIVE_LOW) ? 0 : 1;
++    gpio_direction_output(gpio_info->firefly_gpio, gpio_info->gpio_enable_value);
++    printk("Firefly gpio putout finish \n");
++
++
++    gpio = of_get_named_gpio_flags(firefly_gpio_node, "firefly-irq-gpio", 0, &flag);
++    if (!gpio_is_valid(gpio))
++    {
++        dev_err(&pdev->dev, "firefly-irq-gpio: %d is invalid\n", gpio);
++        return -ENODEV;
++    }
++
++    gpio_info->firefly_irq_gpio = gpio;
++    gpio_info->firefly_irq_mode = flag;
++    gpio_info->firefly_irq = gpio_to_irq(gpio_info->firefly_irq_gpio);
++    if (gpio_info->firefly_irq)
++    {
++        if (gpio_request(gpio, "firefly-irq-gpio"))
++        {
++            dev_err(&pdev->dev, "firefly-irq-gpio: %d request failed!\n", gpio);
++            gpio_free(gpio);
++            return IRQ_NONE;
++        }
++
++        ret = request_irq(gpio_info->firefly_irq, firefly_gpio_irq,
++                          flag, "firefly-gpio", gpio_info);
++        if (ret != 0)
++        {
++            free_irq(gpio_info->firefly_irq, gpio_info);
++            dev_err(&pdev->dev, "Failed to request IRQ: %d\n", ret);
++        }
++    }
++    printk("Firefly irq gpio finish \n");
++
++
++    return 0;
++}
++
++static struct of_device_id firefly_match_table[] = {
++        { .compatible = "firefly,rk3588-gpio",},
++        {},
++};
++
++static struct platform_driver firefly_gpio_driver = {
++        .driver = {
++                .name = "firefly-gpio",
++                .owner = THIS_MODULE,
++                .of_match_table = firefly_match_table,
++        },
++        .probe = firefly_gpio_probe,
++};
++
++static int firefly_gpio_init(void)
++{
++    int ret;
++    printk("Firefly gpio driver init!\n");
++    ret = platform_driver_register(&firefly_gpio_driver);
++    printk("Firefly gpio driver register return : %d \n",ret);
++    return ret ;
++}
++module_init(firefly_gpio_init);
++
++static void firefly_gpio_exit(void)
++{
++        platform_driver_unregister(&firefly_gpio_driver);
++}
++module_exit(firefly_gpio_exit);
++
++MODULE_AUTHOR("maocl <service@t-firefly.com>");
++MODULE_DESCRIPTION("Firefly GPIO driver");
++MODULE_ALIAS("platform:firefly-gpio");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/gpio/gpio-max96752f.c b/drivers/gpio/gpio-max96752f.c
+new file mode 100644
+index 000000000..1c3816737
+--- /dev/null
++++ b/drivers/gpio/gpio-max96752f.c
+@@ -0,0 +1,104 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Maxim MAX96752F GPIO driver
++ *
++ * Copyright (C) 2022 Rockchip Electronics Co. Ltd.
++ */
++
++#include <linux/gpio/driver.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/mfd/max96752f.h>
++
++struct max96752f_gpio {
++	struct device *dev;
++	struct regmap *regmap;
++	struct gpio_chip gpio_chip;
++};
++
++static int max96752f_gpio_direction_output(struct gpio_chip *gc,
++					   unsigned int offset, int value)
++{
++	struct max96752f_gpio *gpio = gpiochip_get_data(gc);
++
++	regmap_update_bits(gpio->regmap, GPIO_A_REG(offset),
++			   GPIO_OUT_DIS | GPIO_OUT,
++			   FIELD_PREP(GPIO_OUT_DIS, 0) |
++			   FIELD_PREP(GPIO_OUT, value));
++
++	return 0;
++}
++
++static void max96752f_gpio_set(struct gpio_chip *gc, unsigned int offset,
++			       int value)
++{
++	struct max96752f_gpio *gpio = gpiochip_get_data(gc);
++
++	regmap_update_bits(gpio->regmap, GPIO_A_REG(offset), GPIO_OUT,
++			   FIELD_PREP(GPIO_OUT, value));
++}
++
++static int max96752f_gpio_get(struct gpio_chip *gc, unsigned int offset)
++{
++	struct max96752f_gpio *gpio = gpiochip_get_data(gc);
++	unsigned int value;
++
++	regmap_read(gpio->regmap, GPIO_A_REG(offset), &value);
++
++	return !!FIELD_GET(GPIO_OUT, value);
++}
++
++static int max96752f_gpio_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct max96752f_gpio *gpio;
++	int ret;
++
++	gpio = devm_kzalloc(dev, sizeof(*gpio), GFP_KERNEL);
++	if (!gpio)
++		return -ENOMEM;
++
++	gpio->dev = dev;
++	platform_set_drvdata(pdev, gpio);
++
++	gpio->regmap = dev_get_regmap(dev->parent, NULL);
++	if (!gpio->regmap)
++		return dev_err_probe(dev, -ENODEV, "failed to get regmap\n");
++
++	gpio->gpio_chip.of_node = dev->of_node;
++	gpio->gpio_chip.label = dev_name(dev);
++	gpio->gpio_chip.parent = dev->parent;
++	gpio->gpio_chip.direction_output = max96752f_gpio_direction_output;
++	gpio->gpio_chip.set = max96752f_gpio_set;
++	gpio->gpio_chip.get = max96752f_gpio_get;
++	gpio->gpio_chip.ngpio = 16;
++	gpio->gpio_chip.can_sleep = true;
++	gpio->gpio_chip.base = -1;
++
++	ret = devm_gpiochip_add_data(dev, &gpio->gpio_chip, gpio);
++	if (ret)
++		return dev_err_probe(dev, ret, "failed to add gpio chip\n");
++
++	return 0;
++}
++
++static const struct of_device_id max96752f_gpio_of_match[] = {
++	{ .name = "maxim,max96752f-gpio", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, max96752f_gpio_of_match);
++
++static struct platform_driver max96752f_gpio_driver = {
++	.driver = {
++		.name	= "max96752f-gpio",
++		.of_match_table = max96752f_gpio_of_match,
++	},
++	.probe = max96752f_gpio_probe,
++};
++
++module_platform_driver(max96752f_gpio_driver);
++
++MODULE_AUTHOR("Wyon Bi <bivvy.bi@rock-chips.com>");
++MODULE_DESCRIPTION("Maxim MAX96752F GPIO driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 43babd327..ed7c5fc47 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -325,40 +325,6 @@ static int mvebu_gpio_get(struct gpio_chip *chip, unsigned int pin)
+ 	return (u >> pin) & 1;
+ }
+ 
+-#ifdef CONFIG_MACH_QNAPTS
+-static int mvebu_gpio_blink_duration(struct gpio_chip *chip, unsigned int pin, unsigned int value, int use_counter_A)
+-{
+-	struct mvebu_gpio_chip *mvchip = gpiochip_get_data(chip);
+-	u32 blink_on_duration;
+-	u32 blink_off_duration;
+-	u32 offset;
+-	if (use_counter_A)
+-		offset = 0x1F0;
+-	else
+-		offset = 0x1F8;
+-
+-	regmap_read(mvchip->regs, offset, &blink_on_duration);
+-	if (blink_on_duration != value)
+-		regmap_write(mvchip->regs, offset, value);
+-
+-	return 0;
+-}
+-
+-static int mvebu_gpio_blink(struct gpio_chip *chip, unsigned int pin,
+-                 int value)
+-{
+-	struct mvebu_gpio_chip *mvchip = gpiochip_get_data(chip);
+-
+-	regmap_update_bits(mvchip->regs, GPIO_BLINK_EN_OFF + mvchip->offset,
+-			   BIT(pin), value ? BIT(pin) : 0);
+-
+-	// QNAP only use coutner A and value is 0x5000000
+-//	mvebu_gpio_blink_duration(chip, pin, 0x5000000, 1);
+-	mvebu_gpio_blink_duration(chip, pin, 0x4000000, 1);
+-
+-	return 0;
+-}
+-#else
+ static void mvebu_gpio_blink(struct gpio_chip *chip, unsigned int pin,
+ 			     int value)
+ {
+@@ -367,7 +333,6 @@ static void mvebu_gpio_blink(struct gpio_chip *chip, unsigned int pin,
+ 	regmap_update_bits(mvchip->regs, GPIO_BLINK_EN_OFF + mvchip->offset,
+ 			   BIT(pin), value ? BIT(pin) : 0);
+ }
+-#endif
+ 
+ static int mvebu_gpio_direction_input(struct gpio_chip *chip, unsigned int pin)
+ {
+@@ -1169,9 +1134,6 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
+ 	mvchip->chip.direction_input = mvebu_gpio_direction_input;
+ 	mvchip->chip.get = mvebu_gpio_get;
+ 	mvchip->chip.direction_output = mvebu_gpio_direction_output;
+-#ifdef CONFIG_MACH_QNAPTS
+-	mvchip->chip.set_blink = mvebu_gpio_blink;
+-#endif
+ 	mvchip->chip.set = mvebu_gpio_set;
+ 	if (have_irqs)
+ 		mvchip->chip.to_irq = mvebu_gpio_to_irq;
+diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
+index 7cc7d1371..b156bd294 100644
+--- a/drivers/gpio/gpio-pca953x.c
++++ b/drivers/gpio/gpio-pca953x.c
+@@ -954,6 +954,9 @@ static int pca953x_probe(struct i2c_client *client,
+ 	u32 invert = 0;
+ 	struct regulator *reg;
+ 	const struct regmap_config *regmap_config;
++	struct device *dev = &client->dev;
++	struct device_node *node = dev->of_node;
++	u32 gpio_group_start = 500;
+ 
+ 	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
+ 	if (chip == NULL)
+@@ -965,6 +968,9 @@ static int pca953x_probe(struct i2c_client *client,
+ 		chip->gpio_start = pdata->gpio_base;
+ 		invert = pdata->invert;
+ 		chip->names = pdata->names;
++	} else if (!of_property_read_u32(node, "gpio-group-num", &gpio_group_start)) {
++	        chip->gpio_start = gpio_group_start;
++	        irq_base = 0;
+ 	} else {
+ 		struct gpio_desc *reset_gpio;
+ 
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index 2f895a2b8..be9002d62 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -1039,3 +1039,14 @@ void of_gpiochip_remove(struct gpio_chip *chip)
+ {
+ 	of_node_put(chip->of_node);
+ }
++
++void of_gpio_dev_init(struct gpio_chip *gc, struct gpio_device *gdev)
++{
++	/* If the gpiochip has an assigned OF node this takes precedence */
++	if (gc->of_node)
++		gdev->dev.of_node = gc->of_node;
++	else
++		gc->of_node = gdev->dev.of_node;
++	if (gdev->dev.of_node)
++		gdev->dev.fwnode = of_fwnode_handle(gdev->dev.of_node);
++}
+diff --git a/drivers/gpio/gpiolib-of.h b/drivers/gpio/gpiolib-of.h
+index ed26664f1..8af2bc899 100644
+--- a/drivers/gpio/gpiolib-of.h
++++ b/drivers/gpio/gpiolib-of.h
+@@ -15,6 +15,7 @@ int of_gpiochip_add(struct gpio_chip *gc);
+ void of_gpiochip_remove(struct gpio_chip *gc);
+ int of_gpio_get_count(struct device *dev, const char *con_id);
+ bool of_gpio_need_valid_mask(const struct gpio_chip *gc);
++void of_gpio_dev_init(struct gpio_chip *gc, struct gpio_device *gdev);
+ #else
+ static inline struct gpio_desc *of_find_gpio(struct device *dev,
+ 					     const char *con_id,
+@@ -33,6 +34,10 @@ static inline bool of_gpio_need_valid_mask(const struct gpio_chip *gc)
+ {
+ 	return false;
+ }
++static inline void of_gpio_dev_init(struct gpio_chip *gc,
++				    struct gpio_device *gdev)
++{
++}
+ #endif /* CONFIG_OF_GPIO */
+ 
+ extern struct notifier_block gpio_of_notifier;
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 388a7abd0..69b744f29 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -30,6 +30,8 @@
+ 
+ #define CREATE_TRACE_POINTS
+ #include <trace/events/gpio.h>
++#undef CREATE_TRACE_POINTS
++#include <trace/hooks/gpiolib.h>
+ 
+ /* Implementation infrastructure for GPIO interfaces.
+  *
+@@ -55,8 +57,10 @@
+ static DEFINE_IDA(gpio_ida);
+ static dev_t gpio_devt;
+ #define GPIO_DEV_MAX 256 /* 256 GPIO chip devices supported */
++static int gpio_bus_match(struct device *dev, struct device_driver *drv);
+ static struct bus_type gpio_bus_type = {
+ 	.name = "gpio",
++	.match = gpio_bus_match,
+ };
+ 
+ /*
+@@ -467,7 +471,7 @@ EXPORT_SYMBOL_GPL(gpiochip_line_is_valid);
+ 
+ static void gpiodevice_release(struct device *dev)
+ {
+-	struct gpio_device *gdev = dev_get_drvdata(dev);
++	struct gpio_device *gdev = container_of(dev, struct gpio_device, dev);
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&gpio_lock, flags);
+@@ -574,6 +578,7 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
+ 	unsigned	i;
+ 	int		base = gc->base;
+ 	struct gpio_device *gdev;
++	bool		block_gpio_read = false;
+ 
+ 	/*
+ 	 * First: allocate and populate the internal stat container, and
+@@ -598,6 +603,8 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
+ 		gc->of_node = gdev->dev.of_node;
+ #endif
+ 
++	of_gpio_dev_init(gc, gdev);
++
+ 	/*
+ 	 * Assign fwnode depending on the result of the previous calls,
+ 	 * if none of them succeed, assign it to the parent's one.
+@@ -711,15 +718,18 @@ int gpiochip_add_data_with_key(struct gpio_chip *gc, void *data,
+ 	if (ret)
+ 		goto err_remove_of_chip;
+ 
+-	for (i = 0; i < gc->ngpio; i++) {
+-		struct gpio_desc *desc = &gdev->descs[i];
++	trace_android_vh_gpio_block_read(gdev, &block_gpio_read);
++	if (!block_gpio_read) {
++		for (i = 0; i < gc->ngpio; i++) {
++			struct gpio_desc *desc = &gdev->descs[i];
+ 
+-		if (gc->get_direction && gpiochip_line_is_valid(gc, i)) {
+-			assign_bit(FLAG_IS_OUT,
+-				   &desc->flags, !gc->get_direction(gc, i));
+-		} else {
+-			assign_bit(FLAG_IS_OUT,
+-				   &desc->flags, !gc->direction_input);
++			if (gc->get_direction && gpiochip_line_is_valid(gc, i)) {
++				assign_bit(FLAG_IS_OUT,
++					   &desc->flags, !gc->get_direction(gc, i));
++			} else {
++				assign_bit(FLAG_IS_OUT,
++					   &desc->flags, !gc->direction_input);
++			}
+ 		}
+ 	}
+ 
+@@ -4383,6 +4393,41 @@ void gpiod_put_array(struct gpio_descs *descs)
+ }
+ EXPORT_SYMBOL_GPL(gpiod_put_array);
+ 
++
++static int gpio_bus_match(struct device *dev, struct device_driver *drv)
++{
++	/*
++	 * Only match if the fwnode doesn't already have a proper struct device
++	 * created for it.
++	 */
++	if (dev->fwnode && dev->fwnode->dev != dev)
++		return 0;
++	return 1;
++}
++
++static int gpio_stub_drv_probe(struct device *dev)
++{
++	/*
++	 * The DT node of some GPIO chips have a "compatible" property, but
++	 * never have a struct device added and probed by a driver to register
++	 * the GPIO chip with gpiolib. In such cases, fw_devlink=on will cause
++	 * the consumers of the GPIO chip to get probe deferred forever because
++	 * they will be waiting for a device associated with the GPIO chip
++	 * firmware node to get added and bound to a driver.
++	 *
++	 * To allow these consumers to probe, we associate the struct
++	 * gpio_device of the GPIO chip with the firmware node and then simply
++	 * bind it to this stub driver.
++	 */
++	return 0;
++}
++
++static struct device_driver gpio_stub_drv = {
++	.name = "gpio_stub_drv",
++	.bus = &gpio_bus_type,
++	.probe = gpio_stub_drv_probe,
++};
++
+ static int __init gpiolib_dev_init(void)
+ {
+ 	int ret;
+@@ -4394,9 +4439,17 @@ static int __init gpiolib_dev_init(void)
+ 		return ret;
+ 	}
+ 
++	ret = driver_register(&gpio_stub_drv);
++	if (ret < 0) {
++		pr_err("gpiolib: could not register GPIO stub driver\n");
++		bus_unregister(&gpio_bus_type);
++		return ret;
++	}
++
+ 	ret = alloc_chrdev_region(&gpio_devt, 0, GPIO_DEV_MAX, GPIOCHIP_NAME);
+ 	if (ret < 0) {
+ 		pr_err("gpiolib: failed to allocate char dev region\n");
++		driver_unregister(&gpio_stub_drv);
+ 		bus_unregister(&gpio_bus_type);
+ 		return ret;
+ 	}
+diff --git a/drivers/pci/controller/dwc/Kconfig b/drivers/pci/controller/dwc/Kconfig
+index 239608d7c..c5ce1de52 100644
+--- a/drivers/pci/controller/dwc/Kconfig
++++ b/drivers/pci/controller/dwc/Kconfig
+@@ -91,6 +91,14 @@ config PCIE_DW_ROCKCHIP
+ 	help
+ 	  Enables support for the DW PCIe controller in the Rockchip SoC.
+ 
++config PCIE_RK_THREADED_INIT
++    bool "Threaded initialize Rockchip DW based PCIe controller"
++    depends on PCIE_DW_ROCKCHIP
++    default y
++    help
++      Enables threaded initialize Rockchip DW based PCIe controller.
++
++
+ config PCI_EXYNOS
+ 	bool "Samsung Exynos PCIe controller"
+ 	depends on SOC_EXYNOS5440 || COMPILE_TEST
+diff --git a/drivers/pci/pcie/Kconfig b/drivers/pci/pcie/Kconfig
+index 45a2ef702..88f36004d 100644
+--- a/drivers/pci/pcie/Kconfig
++++ b/drivers/pci/pcie/Kconfig
+@@ -110,6 +110,12 @@ config PCIEASPM_PERFORMANCE
+ 	  Disable PCI Express ASPM L0s and L1, even if the BIOS enabled them.
+ endchoice
+ 
++config PCIEASPM_EXT
++	tristate "Extend ASPM function"
++	depends on PCIEASPM
++	help
++	  This enables the extensions APIs for ASPM control.
++
+ config PCIE_PME
+ 	def_bool y
+ 	depends on PCIEPORTBUS && PM
+diff --git a/drivers/pci/pcie/Makefile b/drivers/pci/pcie/Makefile
+index 9a7085668..5b6451f5c 100644
+--- a/drivers/pci/pcie/Makefile
++++ b/drivers/pci/pcie/Makefile
+@@ -7,6 +7,7 @@ pcieportdrv-y			:= portdrv_core.o portdrv_pci.o err.o
+ obj-$(CONFIG_PCIEPORTBUS)	+= pcieportdrv.o
+ 
+ obj-$(CONFIG_PCIEASPM)		+= aspm.o
++obj-$(CONFIG_PCIEASPM_EXT)	+= aspm_ext.o
+ obj-$(CONFIG_PCIEAER)		+= aer.o
+ obj-$(CONFIG_PCIEAER_INJECT)	+= aer_inject.o
+ obj-$(CONFIG_PCIE_PME)		+= pme.o
+diff --git a/drivers/pci/pcie/aspm_ext.c b/drivers/pci/pcie/aspm_ext.c
+new file mode 100644
+index 000000000..113a24c7e
+--- /dev/null
++++ b/drivers/pci/pcie/aspm_ext.c
+@@ -0,0 +1,339 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Rockchip PCIe Apis For WIFI
++ *
++ * Copyright (c) 2022 Rockchip Electronics Co., Ltd.
++ */
++
++#include <linux/kernel.h>
++#include <linux/pci.h>
++#include <linux/aspm_ext.h>
++#include <linux/errno.h>
++
++
++static u32 rockchip_pcie_pcie_access_cap(struct pci_dev *pdev, int cap, uint offset,
++					 bool is_ext, bool is_write, u32 writeval)
++{
++	int cap_ptr = 0;
++	u32 ret = -1;
++	u32 readval;
++
++	if (!(pdev)) {
++		pci_err(pdev, "%s: pdev is NULL\n", __func__);
++		return ret;
++	}
++
++	/* Find Capability offset */
++	if (is_ext) {
++		/* removing max EXT_CAP_ID check as
++		 * linux kernel definition's max value is not updated yet as per spec
++		 */
++		cap_ptr = pci_find_ext_capability(pdev, cap);
++
++	} else {
++		/* removing max PCI_CAP_ID_MAX check as
++		 * previous kernel versions dont have this definition
++		 */
++		cap_ptr = pci_find_capability(pdev, cap);
++	}
++
++	/* Return if capability with given ID not found */
++	if (cap_ptr == 0) {
++		pci_err(pdev, "%s: PCI Cap(0x%02x) not supported.\n",
++		       __func__, cap);
++		return -EINVAL;
++	}
++
++	if (is_write) {
++		pci_write_config_dword(pdev, (cap_ptr + offset), writeval);
++		ret = 0;
++
++	} else {
++		pci_read_config_dword(pdev, (cap_ptr + offset), &readval);
++		ret = readval;
++	}
++
++	return ret;
++}
++
++static bool rockchip_pcie_bus_aspm_enable_dev(char *device, struct pci_dev *dev, bool enable)
++{
++	u32 linkctrl_before;
++	u32 linkctrl_after = 0;
++	u8 linkctrl_asm;
++
++	linkctrl_before = rockchip_pcie_pcie_access_cap(dev, PCI_CAP_ID_EXP, PCI_EXP_LNKCTL,
++							false, false, 0);
++	linkctrl_asm = (linkctrl_before & PCI_EXP_LNKCTL_ASPMC);
++
++	if (enable) {
++		if (linkctrl_asm == PCI_EXP_LNKCTL_ASPM_L1) {
++			pci_err(dev, "%s: %s already enabled  linkctrl: 0x%x\n",
++			       __func__, device, linkctrl_before);
++			return false;
++		}
++		/* Enable only L1 ASPM (bit 1) */
++		rockchip_pcie_pcie_access_cap(dev, PCI_CAP_ID_EXP, PCI_EXP_LNKCTL, false,
++					      true, (linkctrl_before | PCI_EXP_LNKCTL_ASPM_L1));
++	} else {
++		if (linkctrl_asm == 0) {
++			pci_err(dev, "%s: %s already disabled linkctrl: 0x%x\n",
++			       __func__, device, linkctrl_before);
++			return false;
++		}
++		/* Disable complete ASPM (bit 1 and bit 0) */
++		rockchip_pcie_pcie_access_cap(dev, PCI_CAP_ID_EXP, PCI_EXP_LNKCTL, false,
++					      true, (linkctrl_before & (~PCI_EXP_LNKCTL_ASPMC)));
++	}
++
++	linkctrl_after = rockchip_pcie_pcie_access_cap(dev, PCI_CAP_ID_EXP, PCI_EXP_LNKCTL,
++						       false, false, 0);
++	pci_err(dev, "%s: %s %s, linkctrl_before: 0x%x linkctrl_after: 0x%x\n",
++	       __func__, device, (enable ? "ENABLE " : "DISABLE"),
++		linkctrl_before, linkctrl_after);
++
++	return true;
++}
++
++bool rockchip_pcie_bus_aspm_enable_rc_ep(struct pci_dev *child, struct pci_dev *parent, bool enable)
++{
++	bool ret;
++
++	if (enable) {
++		/* Enable only L1 ASPM first RC then EP */
++		ret = rockchip_pcie_bus_aspm_enable_dev("RC", parent, enable);
++		ret = rockchip_pcie_bus_aspm_enable_dev("EP", child, enable);
++	} else {
++		/* Disable complete ASPM first EP then RC */
++		ret = rockchip_pcie_bus_aspm_enable_dev("EP", child, enable);
++		ret = rockchip_pcie_bus_aspm_enable_dev("RC", parent, enable);
++	}
++
++	return ret;
++}
++
++static void pci_clear_and_set_dword(struct pci_dev *pdev, int pos,
++				    u32 clear, u32 set)
++{
++	u32 val;
++
++	pci_read_config_dword(pdev, pos, &val);
++	val &= ~clear;
++	val |= set;
++	pci_write_config_dword(pdev, pos, val);
++}
++
++/* Convert L1SS T_pwr encoding to usec */
++static u32 calc_l1ss_pwron(struct pci_dev *pdev, u32 scale, u32 val)
++{
++	switch (scale) {
++	case 0:
++		return val * 2;
++	case 1:
++		return val * 10;
++	case 2:
++		return val * 100;
++	}
++
++	return 0;
++}
++
++static void encode_l12_threshold(u32 threshold_us, u32 *scale, u32 *value)
++{
++	u32 threshold_ns = threshold_us * 1000;
++
++	/* See PCIe r3.1, sec 7.33.3 and sec 6.18 */
++	if (threshold_ns < 32) {
++		*scale = 0;
++		*value = threshold_ns;
++	} else if (threshold_ns < 1024) {
++		*scale = 1;
++		*value = threshold_ns >> 5;
++	} else if (threshold_ns < 32768) {
++		*scale = 2;
++		*value = threshold_ns >> 10;
++	} else if (threshold_ns < 1048576) {
++		*scale = 3;
++		*value = threshold_ns >> 15;
++	} else if (threshold_ns < 33554432) {
++		*scale = 4;
++		*value = threshold_ns >> 20;
++	} else {
++		*scale = 5;
++		*value = threshold_ns >> 25;
++	}
++}
++
++/* Calculate L1.2 PM substate timing parameters */
++static void aspm_calc_l1ss_info(struct pci_dev *child, struct pci_dev *parent)
++{
++	u32 val1, val2, scale1, scale2;
++	u32 t_common_mode, t_power_on, l1_2_threshold, scale, value;
++	u32 ctl1 = 0, ctl2 = 0;
++	u32 pctl1, pctl2, cctl1, cctl2;
++	u32 pl1_2_enables, cl1_2_enables;
++	u32 parent_l1ss_cap, child_l1ss_cap;
++
++	/* Setup L1 substate */
++	pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CAP,
++			      &parent_l1ss_cap);
++	pci_read_config_dword(child, child->l1ss + PCI_L1SS_CAP,
++			      &child_l1ss_cap);
++
++	/* Choose the greater of the two Port Common_Mode_Restore_Times */
++	val1 = (parent_l1ss_cap & PCI_L1SS_CAP_CM_RESTORE_TIME) >> 8;
++	val2 = (child_l1ss_cap & PCI_L1SS_CAP_CM_RESTORE_TIME) >> 8;
++	t_common_mode = max(val1, val2);
++
++	/* Choose the greater of the two Port T_POWER_ON times */
++	val1   = (parent_l1ss_cap & PCI_L1SS_CAP_P_PWR_ON_VALUE) >> 19;
++	scale1 = (parent_l1ss_cap & PCI_L1SS_CAP_P_PWR_ON_SCALE) >> 16;
++	val2   = (child_l1ss_cap & PCI_L1SS_CAP_P_PWR_ON_VALUE) >> 19;
++	scale2 = (child_l1ss_cap & PCI_L1SS_CAP_P_PWR_ON_SCALE) >> 16;
++
++	if (calc_l1ss_pwron(parent, scale1, val1) >
++	    calc_l1ss_pwron(child, scale2, val2)) {
++		ctl2 |= scale1 | (val1 << 3);
++		t_power_on = calc_l1ss_pwron(parent, scale1, val1);
++	} else {
++		ctl2 |= scale2 | (val2 << 3);
++		t_power_on = calc_l1ss_pwron(child, scale2, val2);
++	}
++
++	/* Set LTR_L1.2_THRESHOLD to the time required to transition the
++	 * Link from L0 to L1.2 and back to L0 so we enter L1.2 only if
++	 * downstream devices report (via LTR) that they can tolerate at
++	 * least that much latency.
++	 *
++	 * Based on PCIe r3.1, sec 5.5.3.3.1, Figures 5-16 and 5-17, and
++	 * Table 5-11.  T(POWER_OFF) is at most 2us and T(L1.2) is at
++	 * least 4us.
++	 */
++	l1_2_threshold = 2 + 4 + t_common_mode + t_power_on;
++	encode_l12_threshold(l1_2_threshold, &scale, &value);
++	ctl1 |= t_common_mode << 8 | scale << 29 | value << 16;
++
++	pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CTL1, &pctl1);
++	pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CTL2, &pctl2);
++	pci_read_config_dword(child, child->l1ss + PCI_L1SS_CTL1, &cctl1);
++	pci_read_config_dword(child, child->l1ss + PCI_L1SS_CTL2, &cctl2);
++
++	if (ctl1 == pctl1 && ctl1 == cctl1 &&
++	    ctl2 == pctl2 && ctl2 == cctl2)
++		return;
++
++	/* Disable L1.2 while updating.  See PCIe r5.0, sec 5.5.4, 7.8.3.3 */
++	pl1_2_enables = pctl1 & PCI_L1SS_CTL1_L1_2_MASK;
++	cl1_2_enables = cctl1 & PCI_L1SS_CTL1_L1_2_MASK;
++
++	if (pl1_2_enables || cl1_2_enables) {
++		pci_clear_and_set_dword(child, child->l1ss + PCI_L1SS_CTL1,
++					PCI_L1SS_CTL1_L1_2_MASK, 0);
++		pci_clear_and_set_dword(parent, parent->l1ss + PCI_L1SS_CTL1,
++					PCI_L1SS_CTL1_L1_2_MASK, 0);
++	}
++
++	/* Program T_POWER_ON times in both ports */
++	pci_write_config_dword(parent, parent->l1ss + PCI_L1SS_CTL2, ctl2);
++	pci_write_config_dword(child, child->l1ss + PCI_L1SS_CTL2, ctl2);
++
++	/* Program Common_Mode_Restore_Time in upstream device */
++	pci_clear_and_set_dword(parent, parent->l1ss + PCI_L1SS_CTL1,
++				PCI_L1SS_CTL1_CM_RESTORE_TIME, ctl1);
++
++	/* Program LTR_L1.2_THRESHOLD time in both ports */
++	pci_clear_and_set_dword(parent,	parent->l1ss + PCI_L1SS_CTL1,
++				PCI_L1SS_CTL1_LTR_L12_TH_VALUE |
++				PCI_L1SS_CTL1_LTR_L12_TH_SCALE, ctl1);
++	pci_clear_and_set_dword(child, child->l1ss + PCI_L1SS_CTL1,
++				PCI_L1SS_CTL1_LTR_L12_TH_VALUE |
++				PCI_L1SS_CTL1_LTR_L12_TH_SCALE, ctl1);
++
++	if (pl1_2_enables || cl1_2_enables) {
++		pci_clear_and_set_dword(parent, parent->l1ss + PCI_L1SS_CTL1, 0,
++					pl1_2_enables);
++		pci_clear_and_set_dword(child, child->l1ss + PCI_L1SS_CTL1, 0,
++					cl1_2_enables);
++	}
++}
++
++static void rockchip_pcie_bus_l1ss_enable_dev(char *device, struct pci_dev *dev, bool enable)
++{
++	u32 l1ssctrl_before;
++	u32 l1ssctrl_after = 0;
++	u8 l1ss_ep;
++
++	/* Extendend Capacility Reg */
++	l1ssctrl_before = rockchip_pcie_pcie_access_cap(dev, PCI_EXT_CAP_ID_L1SS,
++							PCI_L1SS_CTL1, true, false, 0);
++	l1ss_ep = (l1ssctrl_before & PCI_L1SS_CTL1_L1SS_MASK);
++
++	if (enable) {
++		if (l1ss_ep == PCI_L1SS_CTL1_L1SS_MASK) {
++			pci_err(dev, "%s: %s already enabled,  l1ssctrl: 0x%x\n",
++			       __func__, device, l1ssctrl_before);
++			return;
++		}
++		rockchip_pcie_pcie_access_cap(dev, PCI_EXT_CAP_ID_L1SS, PCI_L1SS_CTL1,
++					      true, true, (l1ssctrl_before | PCI_L1SS_CTL1_L1SS_MASK));
++	} else {
++		if (l1ss_ep == 0) {
++			pci_err(dev, "%s: %s already disabled, l1ssctrl: 0x%x\n",
++			       __func__, device, l1ssctrl_before);
++			return;
++		}
++		rockchip_pcie_pcie_access_cap(dev, PCI_EXT_CAP_ID_L1SS, PCI_L1SS_CTL1,
++					      true, true, (l1ssctrl_before & (~PCI_L1SS_CTL1_L1SS_MASK)));
++	}
++	l1ssctrl_after = rockchip_pcie_pcie_access_cap(dev, PCI_EXT_CAP_ID_L1SS,
++						       PCI_L1SS_CTL1, true, false, 0);
++	pci_err(dev, "%s: %s %s, l1ssctrl_before: 0x%x l1ssctrl_after: 0x%x\n",
++	       __func__, device, (enable ? "ENABLE " : "DISABLE"),
++		l1ssctrl_before, l1ssctrl_after);
++}
++
++bool pcie_aspm_ext_is_rc_ep_l1ss_capable(struct pci_dev *child, struct pci_dev *parent)
++{
++	u32 parent_l1ss_cap, child_l1ss_cap;
++
++	/* Setup L1 substate */
++	pci_read_config_dword(parent, parent->l1ss + PCI_L1SS_CAP,
++			      &parent_l1ss_cap);
++	pci_read_config_dword(child, child->l1ss + PCI_L1SS_CAP,
++			      &child_l1ss_cap);
++
++	if (!(parent_l1ss_cap & PCI_L1SS_CAP_L1_PM_SS))
++		parent_l1ss_cap = 0;
++	if (!(child_l1ss_cap & PCI_L1SS_CAP_L1_PM_SS))
++		child_l1ss_cap = 0;
++
++	if (parent_l1ss_cap && child_l1ss_cap)
++		return true;
++	else
++		return false;
++}
++EXPORT_SYMBOL(pcie_aspm_ext_is_rc_ep_l1ss_capable);
++
++void pcie_aspm_ext_l1ss_enable(struct pci_dev *child, struct pci_dev *parent, bool enable)
++{
++	bool ret;
++
++	/* Disable ASPM of RC and EP */
++	ret = rockchip_pcie_bus_aspm_enable_rc_ep(child, parent, false);
++
++	if (enable) {
++		/* Enable RC then EP */
++		aspm_calc_l1ss_info(child, parent);
++		rockchip_pcie_bus_l1ss_enable_dev("RC", parent, enable);
++		rockchip_pcie_bus_l1ss_enable_dev("EP", child, enable);
++	} else {
++		/* Disable EP then RC */
++		rockchip_pcie_bus_l1ss_enable_dev("EP", child, enable);
++		rockchip_pcie_bus_l1ss_enable_dev("RC", parent, enable);
++	}
++
++	/* Enable ASPM of RC and EP only if this API disabled */
++	if (ret)
++		rockchip_pcie_bus_aspm_enable_rc_ep(child, parent, true);
++}
++EXPORT_SYMBOL(pcie_aspm_ext_l1ss_enable);
+diff --git a/drivers/soc/rockchip/iomux.c b/drivers/soc/rockchip/iomux.c
+new file mode 100644
+index 000000000..b6af2bd3b
+--- /dev/null
++++ b/drivers/soc/rockchip/iomux.c
+@@ -0,0 +1,87 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (c) 2022 Rockchip Electronics Co. Ltd.
++ */
++
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/file.h>
++#include <linux/fs.h>
++#include <linux/list.h>
++#include <linux/uaccess.h>
++#include <linux/ioctl.h>
++#include <linux/types.h>
++#include <linux/miscdevice.h>
++#include <linux/slab.h>
++#include <uapi/linux/rk-iomux.h>
++#include "../../pinctrl/pinctrl-rockchip.h"
++
++struct rk_iomux_device {
++	struct miscdevice dev;
++};
++
++static long rk_iomux_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
++{
++	struct iomux_ioctl_data data;
++	int ret = 0;
++
++	if (_IOC_SIZE(cmd) > sizeof(data))
++		return -EINVAL;
++
++	if (copy_from_user(&data, (void __user *)arg, _IOC_SIZE(cmd)))
++		return -EFAULT;
++
++	if (!(_IOC_DIR(cmd) & _IOC_WRITE))
++		memset(&data, 0, sizeof(data));
++
++	switch (cmd) {
++	case IOMUX_IOC_MUX_SET:
++		ret = rk_iomux_set(data.bank, data.pin, data.mux);
++		if (ret)
++			return ret;
++		break;
++	case IOMUX_IOC_MUX_GET:
++		ret = rk_iomux_get(data.bank, data.pin, &data.mux);
++		if (ret)
++			return ret;
++		break;
++	default:
++		return -ENOTTY;
++	}
++
++	if (_IOC_DIR(cmd) & _IOC_READ) {
++		if (copy_to_user((void __user *)arg, &data, _IOC_SIZE(cmd)))
++			return -EFAULT;
++	}
++
++	return ret;
++}
++
++static const struct file_operations rk_iomux_fops = {
++	.owner          = THIS_MODULE,
++	.unlocked_ioctl = rk_iomux_ioctl,
++	.compat_ioctl	= compat_ptr_ioctl,
++};
++
++static __init int rk_iomux_device_create(void)
++{
++	struct rk_iomux_device *cdev;
++	int ret;
++
++	cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
++	if (!cdev)
++		return -ENOMEM;
++
++	cdev->dev.minor = MISC_DYNAMIC_MINOR;
++	cdev->dev.name = "iomux";
++	cdev->dev.fops = &rk_iomux_fops;
++	cdev->dev.parent = NULL;
++	ret = misc_register(&cdev->dev);
++	if (ret) {
++		pr_err("failed to register iomux device (%d)\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++late_initcall(rk_iomux_device_create);
+diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
+index 54cfb5aeb..1f4f25352 100644
+--- a/include/linux/gpio/driver.h
++++ b/include/linux/gpio/driver.h
+@@ -10,6 +10,7 @@
+ #include <linux/lockdep.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinconf-generic.h>
++#include <linux/android_kabi.h>
+ 
+ struct gpio_desc;
+ struct of_phandle_args;
+@@ -266,8 +267,14 @@ struct gpio_irq_chip {
+ 	 * Store old irq_chip irq_mask callback
+ 	 */
+ 	void		(*irq_mask)(struct irq_data *data);
++		
++	ANDROID_KABI_RESERVE(1);
++	ANDROID_KABI_RESERVE(2);		
++	
+ };
+ 
++
++
+ /**
+  * struct gpio_chip - abstract a GPIO controller
+  * @label: a functional name for the GPIO device, such as a part
+@@ -473,6 +480,9 @@ struct gpio_chip {
+ 	int (*of_xlate)(struct gpio_chip *gc,
+ 			const struct of_phandle_args *gpiospec, u32 *flags);
+ #endif /* CONFIG_OF_GPIO */
++
++	ANDROID_KABI_RESERVE(1);
++	ANDROID_KABI_RESERVE(2);
+ };
+ 
+ extern const char *gpiochip_is_requested(struct gpio_chip *gc,
+diff --git a/include/linux/phy/pcie.h b/include/linux/phy/pcie.h
+new file mode 100644
+index 000000000..81210eb20
+--- /dev/null
++++ b/include/linux/phy/pcie.h
+@@ -0,0 +1,12 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2021 Rockchip Electronics Co., Ltd.
++ */
++#ifndef __PHY_PCIE_H
++#define __PHY_PCIE_H
++
++#define PHY_MODE_PCIE_RC 20
++#define PHY_MODE_PCIE_EP 21
++#define PHY_MODE_PCIE_BIFURCATION 22
++
++#endif
+\ No newline at end of file
+diff --git a/include/trace/hooks/avc.h b/include/trace/hooks/avc.h
+new file mode 100644
+index 000000000..2c76e02fc
+--- /dev/null
++++ b/include/trace/hooks/avc.h
+@@ -0,0 +1,33 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM avc
++
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_AVC_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_AVC_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct avc_node;
++DECLARE_HOOK(android_vh_selinux_avc_insert,
++	TP_PROTO(const struct avc_node *node),
++	TP_ARGS(node));
++
++DECLARE_HOOK(android_vh_selinux_avc_node_delete,
++	TP_PROTO(const struct avc_node *node),
++	TP_ARGS(node));
++
++DECLARE_HOOK(android_vh_selinux_avc_node_replace,
++	TP_PROTO(const struct avc_node *old, const struct avc_node *new),
++	TP_ARGS(old, new));
++
++DECLARE_HOOK(android_vh_selinux_avc_lookup,
++	TP_PROTO(const struct avc_node *node, u32 ssid, u32 tsid, u16 tclass),
++	TP_ARGS(node, ssid, tsid, tclass));
++
++#endif /* _TRACE_HOOK_AVC_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/binder.h b/include/trace/hooks/binder.h
+new file mode 100644
+index 000000000..16dd0a2a6
+--- /dev/null
++++ b/include/trace/hooks/binder.h
+@@ -0,0 +1,87 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM binder
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_BINDER_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_BINDER_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct binder_transaction;
++struct task_struct;
++struct binder_alloc;
++struct binder_proc;
++struct binder_thread;
++struct binder_transaction_data;
++struct seq_file;
++DECLARE_HOOK(android_vh_binder_transaction_init,
++	TP_PROTO(struct binder_transaction *t),
++	TP_ARGS(t));
++DECLARE_HOOK(android_vh_binder_priority_skip,
++	TP_PROTO(struct task_struct *task, bool *skip),
++	TP_ARGS(task, skip));
++DECLARE_HOOK(android_vh_binder_set_priority,
++	TP_PROTO(struct binder_transaction *t, struct task_struct *task),
++	TP_ARGS(t, task));
++DECLARE_HOOK(android_vh_binder_restore_priority,
++	TP_PROTO(struct binder_transaction *t, struct task_struct *task),
++	TP_ARGS(t, task));
++struct binder_proc;
++struct binder_thread;
++DECLARE_HOOK(android_vh_binder_wakeup_ilocked,
++	TP_PROTO(struct task_struct *task, bool sync, struct binder_proc *proc),
++	TP_ARGS(task, sync, proc));
++DECLARE_HOOK(android_vh_binder_wait_for_work,
++	TP_PROTO(bool do_proc_work, struct binder_thread *tsk, struct binder_proc *proc),
++	TP_ARGS(do_proc_work, tsk, proc));
++DECLARE_HOOK(android_vh_sync_txn_recvd,
++	TP_PROTO(struct task_struct *tsk, struct task_struct *from),
++	TP_ARGS(tsk, from));
++DECLARE_HOOK(android_vh_binder_alloc_new_buf_locked,
++	TP_PROTO(size_t size, struct binder_alloc *alloc, int is_async),
++	TP_ARGS(size, alloc, is_async));
++DECLARE_HOOK(android_vh_binder_reply,
++	TP_PROTO(struct binder_proc *target_proc, struct binder_proc *proc,
++		struct binder_thread *thread, struct binder_transaction_data *tr),
++	TP_ARGS(target_proc, proc, thread, tr));
++DECLARE_HOOK(android_vh_binder_trans,
++	TP_PROTO(struct binder_proc *target_proc, struct binder_proc *proc,
++		struct binder_thread *thread, struct binder_transaction_data *tr),
++	TP_ARGS(target_proc, proc, thread, tr));
++DECLARE_RESTRICTED_HOOK(android_rvh_binder_transaction,
++	TP_PROTO(struct binder_proc *target_proc, struct binder_proc *proc,
++		struct binder_thread *thread, struct binder_transaction_data *tr),
++	TP_ARGS(target_proc, proc, thread, tr), 1);
++DECLARE_HOOK(android_vh_binder_preset,
++	TP_PROTO(struct hlist_head *hhead, struct mutex *lock),
++	TP_ARGS(hhead, lock));
++DECLARE_HOOK(android_vh_binder_proc_transaction,
++	TP_PROTO(struct task_struct *caller_task, struct task_struct *binder_proc_task,
++		struct task_struct *binder_th_task, int node_debug_id,
++		unsigned int code, bool pending_async),
++	TP_ARGS(caller_task, binder_proc_task, binder_th_task, node_debug_id, code, pending_async));
++DECLARE_HOOK(android_vh_binder_proc_transaction_end,
++	TP_PROTO(struct task_struct *caller_task, struct task_struct *binder_proc_task,
++		struct task_struct *binder_th_task, unsigned int code,
++		bool pending_async, bool sync),
++	TP_ARGS(caller_task, binder_proc_task, binder_th_task, code, pending_async, sync));
++DECLARE_HOOK(android_vh_binder_new_ref,
++	TP_PROTO(struct task_struct *proc, uint32_t ref_desc, int node_debug_id),
++	TP_ARGS(proc, ref_desc, node_debug_id));
++DECLARE_HOOK(android_vh_binder_del_ref,
++	TP_PROTO(struct task_struct *proc, uint32_t ref_desc),
++	TP_ARGS(proc, ref_desc));
++DECLARE_HOOK(android_vh_binder_print_transaction_info,
++	TP_PROTO(struct seq_file *m, struct binder_proc *proc,
++		 const char *prefix, struct binder_transaction *t),
++	TP_ARGS(m, proc, prefix, t));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_BINDER_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/block.h b/include/trace/hooks/block.h
+new file mode 100644
+index 000000000..0d9d7db39
+--- /dev/null
++++ b/include/trace/hooks/block.h
+@@ -0,0 +1,30 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM block
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_BLOCK_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_BLOCK_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct blk_mq_tag_set;
++struct blk_mq_tags;
++struct blk_mq_alloc_data;
++
++DECLARE_HOOK(android_vh_blk_alloc_rqs,
++	TP_PROTO(size_t *rq_size, struct blk_mq_tag_set *set,
++		struct blk_mq_tags *tags),
++	TP_ARGS(rq_size, set, tags));
++
++DECLARE_HOOK(android_vh_blk_rq_ctx_init,
++	TP_PROTO(struct request *rq, struct blk_mq_tags *tags,
++		struct blk_mq_alloc_data *data, u64 alloc_time_ns),
++	TP_ARGS(rq, tags, data, alloc_time_ns));
++
++#endif /* _TRACE_HOOK_BLOCK_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/bug.h b/include/trace/hooks/bug.h
+new file mode 100644
+index 000000000..685859e0e
+--- /dev/null
++++ b/include/trace/hooks/bug.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM bug
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_BUG_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_BUG_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++DECLARE_RESTRICTED_HOOK(android_rvh_report_bug,
++	TP_PROTO(const char *file, unsigned int line, unsigned long bugaddr),
++	TP_ARGS(file, line, bugaddr), 1);
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_BUG_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/cgroup.h b/include/trace/hooks/cgroup.h
+new file mode 100644
+index 000000000..6b6d7918c
+--- /dev/null
++++ b/include/trace/hooks/cgroup.h
+@@ -0,0 +1,32 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM cgroup
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_CGROUP_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_CGROUP_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct task_struct;
++DECLARE_HOOK(android_vh_cgroup_set_task,
++	TP_PROTO(int ret, struct task_struct *task),
++	TP_ARGS(ret, task));
++DECLARE_RESTRICTED_HOOK(android_rvh_cpuset_fork,
++	TP_PROTO(struct task_struct *p, int *inherit_cpus),
++	TP_ARGS(p, inherit_cpus), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_cgroup_force_kthread_migration,
++	TP_PROTO(struct task_struct *tsk, struct cgroup *dst_cgrp, bool *force_migration),
++	TP_ARGS(tsk, dst_cgrp, force_migration), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_refrigerator,
++	TP_PROTO(bool f),
++	TP_ARGS(f), 1);
++
++struct cgroup_subsys;
++struct cgroup_taskset;
++DECLARE_HOOK(android_vh_cgroup_attach,
++	TP_PROTO(struct cgroup_subsys *ss, struct cgroup_taskset *tset),
++	TP_ARGS(ss, tset))
++#endif
++
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/cpu.h b/include/trace/hooks/cpu.h
+new file mode 100644
+index 000000000..fc3eaf318
+--- /dev/null
++++ b/include/trace/hooks/cpu.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM cpu
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_CPU_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_CPU_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++DECLARE_HOOK(android_vh_cpu_up,
++	TP_PROTO(unsigned int cpu),
++	TP_ARGS(cpu));
++
++DECLARE_HOOK(android_vh_cpu_down,
++	TP_PROTO(unsigned int cpu),
++	TP_ARGS(cpu));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_CPU_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/cpufreq.h b/include/trace/hooks/cpufreq.h
+new file mode 100644
+index 000000000..5e20f7d00
+--- /dev/null
++++ b/include/trace/hooks/cpufreq.h
+@@ -0,0 +1,53 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM cpufreq
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_CPUFREQ_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_CPUFREQ_H
++
++#include <linux/cpufreq.h>
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_RESTRICTED_HOOK(android_rvh_show_max_freq,
++	TP_PROTO(struct cpufreq_policy *policy, unsigned int *max_freq),
++	TP_ARGS(policy, max_freq), 1);
++
++DECLARE_HOOK(android_vh_show_max_freq,
++	TP_PROTO(struct cpufreq_policy *policy, unsigned int *max_freq),
++	TP_ARGS(policy, max_freq));
++
++DECLARE_HOOK(android_vh_freq_table_limits,
++	TP_PROTO(struct cpufreq_policy *policy, unsigned int min_freq,
++		 unsigned int max_freq),
++	TP_ARGS(policy, min_freq, max_freq));
++
++DECLARE_HOOK(android_vh_cpufreq_acct_update_power,
++	TP_PROTO(u64 cputime, struct task_struct *p, unsigned int state),
++	TP_ARGS(cputime, p, state));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_cpufreq_transition,
++	TP_PROTO(struct cpufreq_policy *policy),
++	TP_ARGS(policy), 1);
++
++DECLARE_HOOK(android_vh_cpufreq_resolve_freq,
++	TP_PROTO(struct cpufreq_policy *policy, unsigned int target_freq,
++		unsigned int old_target_freq),
++	TP_ARGS(policy, target_freq, old_target_freq));
++
++DECLARE_HOOK(android_vh_cpufreq_fast_switch,
++	TP_PROTO(struct cpufreq_policy *policy, unsigned int target_freq,
++		unsigned int old_target_freq),
++	TP_ARGS(policy, target_freq, old_target_freq));
++
++DECLARE_HOOK(android_vh_cpufreq_target,
++	TP_PROTO(struct cpufreq_policy *policy, unsigned int target_freq,
++		unsigned int old_target_freq),
++	TP_ARGS(policy, target_freq, old_target_freq));
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_CPUFREQ_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/cpuidle.h b/include/trace/hooks/cpuidle.h
+new file mode 100644
+index 000000000..6d1f4bf7f
+--- /dev/null
++++ b/include/trace/hooks/cpuidle.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM cpuidle
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_CPUIDLE_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_CPUIDLE_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct cpuidle_device;
++
++DECLARE_HOOK(android_vh_cpu_idle_enter,
++	TP_PROTO(int *state, struct cpuidle_device *dev),
++	TP_ARGS(state, dev))
++DECLARE_HOOK(android_vh_cpu_idle_exit,
++	TP_PROTO(int state, struct cpuidle_device *dev),
++	TP_ARGS(state, dev))
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_CPUIDLE_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
++
+diff --git a/include/trace/hooks/cpuidle_psci.h b/include/trace/hooks/cpuidle_psci.h
+new file mode 100644
+index 000000000..94b01eba0
+--- /dev/null
++++ b/include/trace/hooks/cpuidle_psci.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM cpuidle_psci
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_CPUIDLE_PSCI_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_CPUIDLE_PSCI_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++
++struct cpuidle_device;
++DECLARE_HOOK(android_vh_cpuidle_psci_enter,
++	TP_PROTO(struct cpuidle_device *dev, bool s2idle),
++	TP_ARGS(dev, s2idle));
++
++DECLARE_HOOK(android_vh_cpuidle_psci_exit,
++	TP_PROTO(struct cpuidle_device *dev, bool s2idle),
++	TP_ARGS(dev, s2idle));
++
++#endif /* _TRACE_HOOK_CPUIDLE_PSCI_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/creds.h b/include/trace/hooks/creds.h
+new file mode 100644
+index 000000000..dd877e3a1
+--- /dev/null
++++ b/include/trace/hooks/creds.h
+@@ -0,0 +1,34 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM creds
++
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_CREDS_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_CREDS_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct cred;
++struct task_struct;
++DECLARE_HOOK(android_vh_commit_creds,
++	TP_PROTO(const struct task_struct *task, const struct cred *new),
++	TP_ARGS(task, new));
++
++DECLARE_HOOK(android_vh_exit_creds,
++	TP_PROTO(const struct task_struct *task, const struct cred *cred),
++	TP_ARGS(task, cred));
++
++DECLARE_HOOK(android_vh_override_creds,
++	TP_PROTO(const struct task_struct *task, const struct cred *new),
++	TP_ARGS(task, new));
++
++DECLARE_HOOK(android_vh_revert_creds,
++	TP_PROTO(const struct task_struct *task, const struct cred *old),
++	TP_ARGS(task, old));
++
++#endif /* _TRACE_HOOK_CREDS_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/debug.h b/include/trace/hooks/debug.h
+new file mode 100644
+index 000000000..ac006d7fd
+--- /dev/null
++++ b/include/trace/hooks/debug.h
+@@ -0,0 +1,26 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM debug
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_DEBUG_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_DEBUG_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS)
++struct pt_regs;
++
++DECLARE_HOOK(android_vh_ipi_stop,
++	TP_PROTO(struct pt_regs *regs),
++	TP_ARGS(regs))
++#else
++#define trace_android_vh_ipi_stop(regs)
++#define trace_android_vh_ipi_stop_rcuidle(regs)
++#endif
++
++#endif /* _TRACE_HOOK_DEBUG_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/dtask.h b/include/trace/hooks/dtask.h
+new file mode 100644
+index 000000000..3c49af0e6
+--- /dev/null
++++ b/include/trace/hooks/dtask.h
+@@ -0,0 +1,62 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM dtask
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_DTASK_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_DTASK_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct mutex;
++DECLARE_HOOK(android_vh_mutex_wait_start,
++	TP_PROTO(struct mutex *lock),
++	TP_ARGS(lock));
++DECLARE_HOOK(android_vh_mutex_wait_finish,
++	TP_PROTO(struct mutex *lock),
++	TP_ARGS(lock));
++
++struct rt_mutex;
++DECLARE_HOOK(android_vh_rtmutex_wait_start,
++	TP_PROTO(struct rt_mutex *lock),
++	TP_ARGS(lock));
++DECLARE_HOOK(android_vh_rtmutex_wait_finish,
++	TP_PROTO(struct rt_mutex *lock),
++	TP_ARGS(lock));
++
++struct rw_semaphore;
++DECLARE_HOOK(android_vh_rwsem_read_wait_start,
++	TP_PROTO(struct rw_semaphore *sem),
++	TP_ARGS(sem));
++DECLARE_HOOK(android_vh_rwsem_read_wait_finish,
++	TP_PROTO(struct rw_semaphore *sem),
++	TP_ARGS(sem));
++DECLARE_HOOK(android_vh_rwsem_write_wait_start,
++	TP_PROTO(struct rw_semaphore *sem),
++	TP_ARGS(sem));
++DECLARE_HOOK(android_vh_rwsem_write_wait_finish,
++	TP_PROTO(struct rw_semaphore *sem),
++	TP_ARGS(sem));
++
++struct task_struct;
++DECLARE_HOOK(android_vh_sched_show_task,
++	TP_PROTO(struct task_struct *task),
++	TP_ARGS(task));
++DECLARE_HOOK(android_vh_alter_mutex_list_add,
++	TP_PROTO(struct mutex *lock,
++		struct mutex_waiter *waiter,
++		struct list_head *list,
++		bool *already_on_list),
++	TP_ARGS(lock, waiter, list, already_on_list));
++DECLARE_HOOK(android_vh_mutex_unlock_slowpath,
++	TP_PROTO(struct mutex *lock),
++	TP_ARGS(lock));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_DTASK_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/epoch.h b/include/trace/hooks/epoch.h
+new file mode 100644
+index 000000000..f1c5342c8
+--- /dev/null
++++ b/include/trace/hooks/epoch.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM epoch
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_EPOCH_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_EPOCH_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_show_suspend_epoch_val,
++	TP_PROTO(u64 suspend_ns, u64 suspend_cycles),
++	TP_ARGS(suspend_ns, suspend_cycles));
++
++DECLARE_HOOK(android_vh_show_resume_epoch_val,
++	TP_PROTO(u64 resume_cycles),
++	TP_ARGS(resume_cycles));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_EPOCH_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/fault.h b/include/trace/hooks/fault.h
+new file mode 100644
+index 000000000..1daf2d250
+--- /dev/null
++++ b/include/trace/hooks/fault.h
+@@ -0,0 +1,36 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fault
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_FAULT_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_FAULT_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct pt_regs;
++DECLARE_RESTRICTED_HOOK(android_rvh_die_kernel_fault,
++	TP_PROTO(struct pt_regs *regs, unsigned int esr, unsigned long addr, const char *msg),
++	TP_ARGS(regs, esr, addr, msg), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_do_sea,
++	TP_PROTO(struct pt_regs *regs, unsigned int esr, unsigned long addr, const char *msg),
++	TP_ARGS(regs, esr, addr, msg), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_do_mem_abort,
++	TP_PROTO(struct pt_regs *regs, unsigned int esr, unsigned long addr, const char *msg),
++	TP_ARGS(regs, esr, addr, msg), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_do_sp_pc_abort,
++	TP_PROTO(struct pt_regs *regs, unsigned int esr, unsigned long addr, bool user),
++	TP_ARGS(regs, esr, addr, user),
++	TP_CONDITION(!user));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_FAULT_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/fips140.h b/include/trace/hooks/fips140.h
+new file mode 100644
+index 000000000..3aebf6168
+--- /dev/null
++++ b/include/trace/hooks/fips140.h
+@@ -0,0 +1,51 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fips140
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_FIPS140_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_FIPS140_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct crypto_aes_ctx;
++
++/*
++ * These hooks exist only for the benefit of the FIPS140 crypto module, which
++ * uses them to swap out the underlying implementation with one that is integrity
++ * checked as per FIPS 140 requirements. No other uses are allowed or
++ * supported.
++ */
++
++DECLARE_HOOK(android_vh_sha256,
++	     TP_PROTO(const u8 *data,
++		      unsigned int len,
++		      u8 *out,
++		      int *hook_inuse),
++	     TP_ARGS(data, len, out, hook_inuse));
++
++DECLARE_HOOK(android_vh_aes_expandkey,
++	     TP_PROTO(struct crypto_aes_ctx *ctx,
++		      const u8 *in_key,
++		      unsigned int key_len,
++		      int *err),
++	     TP_ARGS(ctx, in_key, key_len, err));
++
++DECLARE_HOOK(android_vh_aes_encrypt,
++	     TP_PROTO(const struct crypto_aes_ctx *ctx,
++		      u8 *out,
++		      const u8 *in,
++		      int *hook_inuse),
++	     TP_ARGS(ctx, out, in, hook_inuse));
++
++DECLARE_HOOK(android_vh_aes_decrypt,
++	     TP_PROTO(const struct crypto_aes_ctx *ctx,
++		      u8 *out,
++		      const u8 *in,
++		      int *hook_inuse),
++	     TP_ARGS(ctx, out, in, hook_inuse));
++
++#endif /* _TRACE_HOOK_FIPS140_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/fpsimd.h b/include/trace/hooks/fpsimd.h
+new file mode 100644
+index 000000000..a4a3ce228
+--- /dev/null
++++ b/include/trace/hooks/fpsimd.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fpsimd
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_FPSIMD_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_FPSIMD_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct task_struct;
++
++DECLARE_HOOK(android_vh_is_fpsimd_save,
++	TP_PROTO(struct task_struct *prev, struct task_struct *next),
++	TP_ARGS(prev, next))
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_FPSIMD_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/fs.h b/include/trace/hooks/fs.h
+new file mode 100644
+index 000000000..90acad536
+--- /dev/null
++++ b/include/trace/hooks/fs.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM fs
++
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_FS_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_FS_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++DECLARE_HOOK(android_vh_ep_create_wakeup_source,
++	TP_PROTO(char *name, int len),
++	TP_ARGS(name, len));
++
++DECLARE_HOOK(android_vh_timerfd_create,
++	TP_PROTO(char *name, int len),
++	TP_ARGS(name, len));
++#endif /* _TRACE_HOOK_FS_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/ftrace_dump.h b/include/trace/hooks/ftrace_dump.h
+new file mode 100644
+index 000000000..ed3be8a0d
+--- /dev/null
++++ b/include/trace/hooks/ftrace_dump.h
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM ftrace_dump
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_FTRACE_DUMP_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_FTRACE_DUMP_H
++
++#include <linux/trace_seq.h>
++#include <linux/trace_events.h>
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_ftrace_oops_enter,
++	TP_PROTO(bool *ftrace_check),
++	TP_ARGS(ftrace_check));
++
++DECLARE_HOOK(android_vh_ftrace_oops_exit,
++	TP_PROTO(bool *ftrace_check),
++	TP_ARGS(ftrace_check));
++
++DECLARE_HOOK(android_vh_ftrace_size_check,
++	TP_PROTO(unsigned long size, bool *ftrace_check),
++	TP_ARGS(size, ftrace_check));
++
++DECLARE_HOOK(android_vh_ftrace_format_check,
++	TP_PROTO(bool *ftrace_check),
++	TP_ARGS(ftrace_check));
++
++DECLARE_HOOK(android_vh_ftrace_dump_buffer,
++	TP_PROTO(struct trace_seq *trace_buf, bool *dump_printk),
++	TP_ARGS(trace_buf, dump_printk));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_FTRACE_DUMP_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/futex.h b/include/trace/hooks/futex.h
+new file mode 100644
+index 000000000..0692dd68d
+--- /dev/null
++++ b/include/trace/hooks/futex.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM futex
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_FUTEX_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_FUTEX_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++#include <linux/plist.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++DECLARE_HOOK(android_vh_alter_futex_plist_add,
++	TP_PROTO(struct plist_node *node,
++		 struct plist_head *head,
++		 bool *already_on_hb),
++	TP_ARGS(node, head, already_on_hb));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_FUTEX_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/gic.h b/include/trace/hooks/gic.h
+new file mode 100644
+index 000000000..2f7d3cfa6
+--- /dev/null
++++ b/include/trace/hooks/gic.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM gic
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_GIC_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_GIC_H
++
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++struct gic_chip_data;
++
++DECLARE_HOOK(android_vh_gic_resume,
++       TP_PROTO(struct gic_chip_data *gd),
++       TP_ARGS(gd));
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_GIC_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/gic_v3.h b/include/trace/hooks/gic_v3.h
+new file mode 100644
+index 000000000..3afb73791
+--- /dev/null
++++ b/include/trace/hooks/gic_v3.h
+@@ -0,0 +1,28 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM gic_v3
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_GIC_V3_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_GIC_V3_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct irq_data;
++struct cpumask;
++DECLARE_HOOK(android_vh_gic_v3_affinity_init,
++	TP_PROTO(int irq, u32 offset, u64 *affinity),
++	TP_ARGS(irq, offset, affinity));
++DECLARE_RESTRICTED_HOOK(android_rvh_gic_v3_set_affinity,
++	TP_PROTO(struct irq_data *d, const struct cpumask *mask_val,
++		 u64 *affinity, bool force, void __iomem *base),
++	TP_ARGS(d, mask_val, affinity, force, base),
++	1);
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_GIC_V3_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/gpiolib.h b/include/trace/hooks/gpiolib.h
+new file mode 100644
+index 000000000..96aca935f
+--- /dev/null
++++ b/include/trace/hooks/gpiolib.h
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM gpiolib
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_GPIOLIB_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_GPIOLIB_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++#include "../drivers/gpio/gpiolib.h"
++
++#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS)
++DECLARE_HOOK(android_vh_gpio_block_read,
++	TP_PROTO(struct gpio_device *gdev, bool *block_gpio_read),
++	TP_ARGS(gdev, block_gpio_read));
++#else
++#define trace_android_vh_gpio_block_read(gdev, block_gpio_read)
++#endif
++
++#endif /* _TRACE_HOOK_GPIOLIB_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/hung_task.h b/include/trace/hooks/hung_task.h
+new file mode 100644
+index 000000000..b355828df
+--- /dev/null
++++ b/include/trace/hooks/hung_task.h
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM hung_task
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_HUNG_TASK_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_HUNG_TASK_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_check_uninterruptible_tasks,
++	TP_PROTO(struct task_struct *t, unsigned long timeout,
++		bool *need_check),
++	TP_ARGS(t, timeout, need_check));
++
++DECLARE_HOOK(android_vh_check_uninterruptible_tasks_dn,
++	TP_PROTO(void *unused),
++	TP_ARGS(unused));
++
++#endif /* _TRACE_HOOK_HUNG_TASK_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/i2c.h b/include/trace/hooks/i2c.h
+new file mode 100644
+index 000000000..71536ad67
+--- /dev/null
++++ b/include/trace/hooks/i2c.h
+@@ -0,0 +1,20 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM i2c
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_I2C_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_I2C_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_of_i2c_get_board_info,
++	TP_PROTO(struct device_node *node, const char **dev_name),
++	TP_ARGS(node, dev_name));
++
++#endif /* _TRACE_HOOK_I2C_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/iommu.h b/include/trace/hooks/iommu.h
+new file mode 100644
+index 000000000..dd54a50b3
+--- /dev/null
++++ b/include/trace/hooks/iommu.h
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM iommu
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_IOMMU_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_IOMMU_H
++
++#include <linux/types.h>
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_iommu_setup_dma_ops,
++	TP_PROTO(struct device *dev, u64 dma_base, u64 size),
++	TP_ARGS(dev, dma_base, size));
++
++DECLARE_HOOK(android_vh_iommu_alloc_iova,
++	TP_PROTO(struct device *dev, dma_addr_t iova, size_t size),
++	TP_ARGS(dev, iova, size));
++
++struct iova_domain;
++
++DECLARE_HOOK(android_vh_iommu_iovad_alloc_iova,
++	TP_PROTO(struct device *dev, struct iova_domain *iovad, dma_addr_t iova, size_t size),
++	TP_ARGS(dev, iovad, iova, size));
++
++DECLARE_HOOK(android_vh_iommu_free_iova,
++	TP_PROTO(dma_addr_t iova, size_t size),
++	TP_ARGS(iova, size));
++
++DECLARE_HOOK(android_vh_iommu_iovad_free_iova,
++	TP_PROTO(struct iova_domain *iovad, dma_addr_t iova, size_t size),
++	TP_ARGS(iovad, iova, size));
++
++
++#endif /* _TRACE_HOOK_IOMMU_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/ipv4.h b/include/trace/hooks/ipv4.h
+new file mode 100644
+index 000000000..06fe06d67
+--- /dev/null
++++ b/include/trace/hooks/ipv4.h
+@@ -0,0 +1,34 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM ipv4
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_IPV4_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_IPV4_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_RESTRICTED_HOOK(android_rvh_tcp_sendmsg_locked,
++	TP_PROTO(struct sock *sk, int size),
++	TP_ARGS(sk, size), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_tcp_recvmsg,
++	TP_PROTO(struct sock *sk),
++	TP_ARGS(sk), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_udp_sendmsg,
++	TP_PROTO(struct sock *sk),
++	TP_ARGS(sk), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_udp_recvmsg,
++	TP_PROTO(struct sock *sk),
++	TP_ARGS(sk), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_tcp_recvmsg_stat,
++	TP_PROTO(struct sock *sk, int size),
++	TP_ARGS(sk, size), 1);
++
++#endif /* _TRACE_HOOK_IPV4_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/ipv6.h b/include/trace/hooks/ipv6.h
+new file mode 100644
+index 000000000..c1998af0c
+--- /dev/null
++++ b/include/trace/hooks/ipv6.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM ipv6
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_IPV6_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_IPV6_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++DECLARE_HOOK(android_vh_ipv6_gen_linklocal_addr,
++	TP_PROTO(struct net_device *dev, bool *ret),
++	TP_ARGS(dev, ret));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_IPV6_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/logbuf.h b/include/trace/hooks/logbuf.h
+new file mode 100644
+index 000000000..f73ad597f
+--- /dev/null
++++ b/include/trace/hooks/logbuf.h
+@@ -0,0 +1,26 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM logbuf
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_LOGBUF_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_LOGBUF_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct printk_ringbuffer;
++struct printk_record;
++
++DECLARE_HOOK(android_vh_logbuf,
++	TP_PROTO(struct printk_ringbuffer *rb, struct printk_record *r),
++	TP_ARGS(rb, r))
++
++DECLARE_HOOK(android_vh_logbuf_pr_cont,
++	TP_PROTO(struct printk_record *r, size_t text_len),
++	TP_ARGS(r, text_len))
++
++#endif /* _TRACE_HOOK_LOGBUF_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/memory.h b/include/trace/hooks/memory.h
+new file mode 100644
+index 000000000..4b3f77a72
+--- /dev/null
++++ b/include/trace/hooks/memory.h
+@@ -0,0 +1,32 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM memory
++
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_MEMORY_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_MEMORY_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++DECLARE_HOOK(android_vh_set_memory_x,
++	TP_PROTO(unsigned long addr, int nr_pages),
++	TP_ARGS(addr, nr_pages));
++
++DECLARE_HOOK(android_vh_set_memory_nx,
++	TP_PROTO(unsigned long addr, int nr_pages),
++	TP_ARGS(addr, nr_pages));
++
++DECLARE_HOOK(android_vh_set_memory_ro,
++	TP_PROTO(unsigned long addr, int nr_pages),
++	TP_ARGS(addr, nr_pages));
++
++DECLARE_HOOK(android_vh_set_memory_rw,
++	TP_PROTO(unsigned long addr, int nr_pages),
++	TP_ARGS(addr, nr_pages));
++
++#endif /* _TRACE_HOOK_MEMORY_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/mm.h b/include/trace/hooks/mm.h
+new file mode 100644
+index 000000000..4b299fd6e
+--- /dev/null
++++ b/include/trace/hooks/mm.h
+@@ -0,0 +1,134 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM mm
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_MM_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_MM_H
++
++#include <linux/types.h>
++
++#include <linux/mm.h>
++#include <linux/oom.h>
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct cma;
++
++DECLARE_RESTRICTED_HOOK(android_rvh_set_skip_swapcache_flags,
++			TP_PROTO(gfp_t *flags),
++			TP_ARGS(flags), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_set_gfp_zone_flags,
++			TP_PROTO(gfp_t *flags),
++			TP_ARGS(flags), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_set_readahead_gfp_mask,
++			TP_PROTO(gfp_t *flags),
++			TP_ARGS(flags), 1);
++DECLARE_HOOK(android_vh_cma_alloc_start,
++	TP_PROTO(s64 *ts),
++	TP_ARGS(ts));
++DECLARE_HOOK(android_vh_cma_alloc_finish,
++	TP_PROTO(struct cma *cma, struct page *page, unsigned long count,
++		 unsigned int align, gfp_t gfp_mask, s64 ts),
++	TP_ARGS(cma, page, count, align, gfp_mask, ts));
++DECLARE_HOOK(android_vh_rmqueue,
++	TP_PROTO(struct zone *preferred_zone, struct zone *zone,
++		unsigned int order, gfp_t gfp_flags,
++		unsigned int alloc_flags, int migratetype),
++	TP_ARGS(preferred_zone, zone, order,
++		gfp_flags, alloc_flags, migratetype));
++DECLARE_HOOK(android_vh_pagecache_get_page,
++	TP_PROTO(struct address_space *mapping, pgoff_t index,
++		int fgp_flags, gfp_t gfp_mask, struct page *page),
++	TP_ARGS(mapping, index, fgp_flags, gfp_mask, page));
++DECLARE_HOOK(android_vh_filemap_fault_get_page,
++	TP_PROTO(struct vm_fault *vmf, struct page **page, bool *retry),
++	TP_ARGS(vmf, page, retry));
++DECLARE_HOOK(android_vh_filemap_fault_cache_page,
++	TP_PROTO(struct vm_fault *vmf, struct page *page),
++	TP_ARGS(vmf, page));
++DECLARE_HOOK(android_vh_meminfo_proc_show,
++	TP_PROTO(struct seq_file *m),
++	TP_ARGS(m));
++DECLARE_HOOK(android_vh_exit_mm,
++	TP_PROTO(struct mm_struct *mm),
++	TP_ARGS(mm));
++DECLARE_HOOK(android_vh_get_from_fragment_pool,
++	TP_PROTO(struct mm_struct *mm, struct vm_unmapped_area_info *info,
++		unsigned long *addr),
++	TP_ARGS(mm, info, addr));
++DECLARE_HOOK(android_vh_exclude_reserved_zone,
++	TP_PROTO(struct mm_struct *mm, struct vm_unmapped_area_info *info),
++	TP_ARGS(mm, info));
++DECLARE_HOOK(android_vh_include_reserved_zone,
++	TP_PROTO(struct mm_struct *mm, struct vm_unmapped_area_info *info,
++		unsigned long *addr),
++	TP_ARGS(mm, info, addr));
++DECLARE_HOOK(android_vh_show_mem,
++	TP_PROTO(unsigned int filter, nodemask_t *nodemask),
++	TP_ARGS(filter, nodemask));
++DECLARE_HOOK(android_vh_alloc_pages_slowpath,
++	TP_PROTO(gfp_t gfp_mask, unsigned int order, unsigned long delta),
++	TP_ARGS(gfp_mask, order, delta));
++DECLARE_HOOK(android_vh_print_slabinfo_header,
++	TP_PROTO(struct seq_file *m),
++	TP_ARGS(m));
++struct slabinfo;
++DECLARE_HOOK(android_vh_cache_show,
++	TP_PROTO(struct seq_file *m, struct slabinfo *sinfo, struct kmem_cache *s),
++	TP_ARGS(m, sinfo, s));
++struct dirty_throttle_control;
++DECLARE_HOOK(android_vh_mm_dirty_limits,
++	TP_PROTO(struct dirty_throttle_control *const gdtc, bool strictlimit,
++		unsigned long dirty, unsigned long bg_thresh,
++		unsigned long nr_reclaimable, unsigned long pages_dirtied),
++	TP_ARGS(gdtc, strictlimit, dirty, bg_thresh,
++		nr_reclaimable, pages_dirtied));
++DECLARE_HOOK(android_vh_oom_check_panic,
++	TP_PROTO(struct oom_control *oc, int *ret),
++	TP_ARGS(oc, ret));
++DECLARE_HOOK(android_vh_save_vmalloc_stack,
++	TP_PROTO(unsigned long flags, struct vm_struct *vm),
++	TP_ARGS(flags, vm));
++DECLARE_HOOK(android_vh_show_stack_hash,
++	TP_PROTO(struct seq_file *m, struct vm_struct *v),
++	TP_ARGS(m, v));
++DECLARE_HOOK(android_vh_save_track_hash,
++	TP_PROTO(bool alloc, unsigned long p),
++	TP_ARGS(alloc, p));
++struct mem_cgroup;
++DECLARE_HOOK(android_vh_vmpressure,
++	TP_PROTO(struct mem_cgroup *memcg, bool *bypass),
++	TP_ARGS(memcg, bypass));
++DECLARE_HOOK(android_vh_mem_cgroup_alloc,
++	TP_PROTO(struct mem_cgroup *memcg),
++	TP_ARGS(memcg));
++DECLARE_HOOK(android_vh_mem_cgroup_free,
++	TP_PROTO(struct mem_cgroup *memcg),
++	TP_ARGS(memcg));
++DECLARE_HOOK(android_vh_mem_cgroup_id_remove,
++	TP_PROTO(struct mem_cgroup *memcg),
++	TP_ARGS(memcg));
++struct cgroup_subsys_state;
++DECLARE_HOOK(android_vh_mem_cgroup_css_online,
++	TP_PROTO(struct cgroup_subsys_state *css, struct mem_cgroup *memcg),
++	TP_ARGS(css, memcg));
++DECLARE_HOOK(android_vh_mem_cgroup_css_offline,
++	TP_PROTO(struct cgroup_subsys_state *css, struct mem_cgroup *memcg),
++	TP_ARGS(css, memcg));
++DECLARE_HOOK(android_vh_kmalloc_slab,
++	TP_PROTO(unsigned int index, gfp_t flags, struct kmem_cache **s),
++	TP_ARGS(index, flags, s));
++DECLARE_HOOK(android_vh_mmap_region,
++	TP_PROTO(struct vm_area_struct *vma, unsigned long addr),
++	TP_ARGS(vma, addr));
++DECLARE_HOOK(android_vh_try_to_unmap_one,
++	TP_PROTO(struct vm_area_struct *vma, struct page *page, unsigned long addr, bool ret),
++	TP_ARGS(vma, page, addr, ret));
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_MM_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/mmc_core.h b/include/trace/hooks/mmc_core.h
+new file mode 100644
+index 000000000..ad367782d
+--- /dev/null
++++ b/include/trace/hooks/mmc_core.h
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM mmc_core
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_MMC_CORE_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_MMC_CORE_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct mmc_host;
++struct mmc_card;
++struct sdhci_host;
++
++DECLARE_HOOK(android_vh_mmc_blk_reset,
++	     TP_PROTO(struct mmc_host *host, int err, bool *allow),
++	     TP_ARGS(host, err, allow));
++DECLARE_HOOK(android_vh_mmc_blk_mq_rw_recovery,
++	     TP_PROTO(struct mmc_card *card),
++	     TP_ARGS(card));
++DECLARE_HOOK(android_vh_sd_update_bus_speed_mode,
++	     TP_PROTO(struct mmc_card *card),
++	     TP_ARGS(card));
++DECLARE_HOOK(android_vh_mmc_attach_sd,
++	     TP_PROTO(struct mmc_host *host, u32 ocr, int err),
++	     TP_ARGS(host, ocr, err));
++DECLARE_HOOK(android_vh_sdhci_get_cd,
++	     TP_PROTO(struct sdhci_host *host, bool *allow),
++	     TP_ARGS(host, allow));
++DECLARE_HOOK(android_vh_mmc_gpio_cd_irqt,
++	     TP_PROTO(struct mmc_host *host, bool *allow),
++	     TP_ARGS(host, allow));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_MMC_CORE_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/module.h b/include/trace/hooks/module.h
+new file mode 100644
+index 000000000..281cb0d37
+--- /dev/null
++++ b/include/trace/hooks/module.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM module
++
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_MODULE_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_MODULE_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct module;
++DECLARE_HOOK(android_vh_set_module_permit_before_init,
++	TP_PROTO(const struct module *mod),
++	TP_ARGS(mod));
++
++DECLARE_HOOK(android_vh_set_module_permit_after_init,
++	TP_PROTO(const struct module *mod),
++	TP_ARGS(mod));
++
++#endif /* _TRACE_HOOK_MODULE_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/net.h b/include/trace/hooks/net.h
+new file mode 100644
+index 000000000..6715aa4eb
+--- /dev/null
++++ b/include/trace/hooks/net.h
+@@ -0,0 +1,36 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM net
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_NET_VH_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_NET_VH_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct packet_type;
++struct list_head;
++struct sk_buff;
++DECLARE_HOOK(android_vh_ptype_head,
++	TP_PROTO(const struct packet_type *pt, struct list_head *vendor_pt),
++	TP_ARGS(pt, vendor_pt));
++DECLARE_HOOK(android_vh_kfree_skb,
++	TP_PROTO(struct sk_buff *skb), TP_ARGS(skb));
++
++struct nf_conn;
++struct sock;
++DECLARE_RESTRICTED_HOOK(android_rvh_nf_conn_alloc,
++	TP_PROTO(struct nf_conn *nf_conn), TP_ARGS(nf_conn), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_nf_conn_free,
++	TP_PROTO(struct nf_conn *nf_conn), TP_ARGS(nf_conn), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_sk_alloc,
++	TP_PROTO(struct sock *sock), TP_ARGS(sock), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_sk_free,
++	TP_PROTO(struct sock *sock), TP_ARGS(sock), 1);
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_NET_VH_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/pci.h b/include/trace/hooks/pci.h
+new file mode 100644
+index 000000000..d9c5e4aec
+--- /dev/null
++++ b/include/trace/hooks/pci.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM pci
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_PCI_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_PCI_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++
++DECLARE_RESTRICTED_HOOK(android_rvh_pci_d3_sleep,
++             TP_PROTO(struct pci_dev *dev, unsigned int delay, int *err),
++             TP_ARGS(dev, delay, err), 1);
++
++#endif /* _TRACE_HOOK_PCI_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/pm_domain.h b/include/trace/hooks/pm_domain.h
+new file mode 100644
+index 000000000..548e350e8
+--- /dev/null
++++ b/include/trace/hooks/pm_domain.h
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM pm_domain
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_PM_DOMAIN_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_PM_DOMAIN_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct generic_pm_domain;
++DECLARE_HOOK(android_vh_allow_domain_state,
++	TP_PROTO(struct generic_pm_domain *genpd, uint32_t idx, bool *allow),
++	TP_ARGS(genpd, idx, allow))
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_PM_DOMAIN_H */
++
++#include <trace/define_trace.h>
++
+diff --git a/include/trace/hooks/power.h b/include/trace/hooks/power.h
+new file mode 100644
+index 000000000..149ea0858
+--- /dev/null
++++ b/include/trace/hooks/power.h
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM power
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_POWER_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_POWER_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct task_struct;
++DECLARE_HOOK(android_vh_try_to_freeze_todo,
++	TP_PROTO(unsigned int todo, unsigned int elapsed_msecs, bool wq_busy),
++	TP_ARGS(todo, elapsed_msecs, wq_busy));
++
++DECLARE_HOOK(android_vh_try_to_freeze_todo_unfrozen,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p));
++
++enum freq_qos_req_type;
++struct freq_qos_request;
++struct freq_constraints;
++
++DECLARE_HOOK(android_vh_freq_qos_add_request,
++	TP_PROTO(struct freq_constraints *qos, struct freq_qos_request *req,
++		enum freq_qos_req_type type, int value, int ret),
++	TP_ARGS(qos, req, type, value, ret));
++
++DECLARE_HOOK(android_vh_freq_qos_update_request,
++		TP_PROTO(struct freq_qos_request *req, int value),
++		TP_ARGS(req, value));
++
++DECLARE_HOOK(android_vh_freq_qos_remove_request,
++		TP_PROTO(struct freq_qos_request *req),
++		TP_ARGS(req));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_POWER_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/preemptirq.h b/include/trace/hooks/preemptirq.h
+new file mode 100644
+index 000000000..b4d32c473
+--- /dev/null
++++ b/include/trace/hooks/preemptirq.h
+@@ -0,0 +1,34 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM preemptirq
++
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_PREEMPTIRQ_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_PREEMPTIRQ_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_RESTRICTED_HOOK(android_rvh_preempt_disable,
++	TP_PROTO(unsigned long ip, unsigned long parent_ip),
++	TP_ARGS(ip, parent_ip), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_preempt_enable,
++	TP_PROTO(unsigned long ip, unsigned long parent_ip),
++	TP_ARGS(ip, parent_ip), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_irqs_disable,
++	TP_PROTO(unsigned long ip, unsigned long parent_ip),
++	TP_ARGS(ip, parent_ip), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_irqs_enable,
++	TP_PROTO(unsigned long ip, unsigned long parent_ip),
++	TP_ARGS(ip, parent_ip), 1);
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_PREEMPTIRQ_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/printk.h b/include/trace/hooks/printk.h
+new file mode 100644
+index 000000000..e4df6e4bf
+--- /dev/null
++++ b/include/trace/hooks/printk.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM printk
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_PRINTK_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_PRINTK_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_printk_hotplug,
++	TP_PROTO(int *flag),
++	TP_ARGS(flag));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_PRINTK_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/psi.h b/include/trace/hooks/psi.h
+new file mode 100644
+index 000000000..62d1a0ee7
+--- /dev/null
++++ b/include/trace/hooks/psi.h
+@@ -0,0 +1,33 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM psi
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_PSI_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_PSI_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS)
++
++struct psi_trigger;
++struct psi_group;
++DECLARE_HOOK(android_vh_psi_event,
++	TP_PROTO(struct psi_trigger *t),
++	TP_ARGS(t));
++
++DECLARE_HOOK(android_vh_psi_group,
++	TP_PROTO(struct psi_group *group),
++	TP_ARGS(group));
++
++#else
++#define trace_android_vh_psi_event(t)
++#define trace_android_vh_psi_group(group)
++#endif
++
++#endif /* _TRACE_HOOK_PSI_H */
++
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/remoteproc.h b/include/trace/hooks/remoteproc.h
+new file mode 100644
+index 000000000..c39c2c1bf
+--- /dev/null
++++ b/include/trace/hooks/remoteproc.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM remoteproc
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_RPROC_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_RPROC_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct rproc;
++
++/* When recovery succeeds */
++DECLARE_HOOK(android_vh_rproc_recovery,
++	TP_PROTO(struct rproc *rproc),
++	TP_ARGS(rproc));
++
++/* When recovery mode is enabled or disabled by sysfs */
++DECLARE_HOOK(android_vh_rproc_recovery_set,
++	TP_PROTO(struct rproc *rproc),
++	TP_ARGS(rproc));
++
++#endif /* _TRACE_HOOK_RPROC_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/rwsem.h b/include/trace/hooks/rwsem.h
+new file mode 100644
+index 000000000..d644a6e21
+--- /dev/null
++++ b/include/trace/hooks/rwsem.h
+@@ -0,0 +1,37 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM rwsem
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_RWSEM_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_RWSEM_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct rw_semaphore;
++struct rwsem_waiter;
++DECLARE_HOOK(android_vh_rwsem_init,
++	TP_PROTO(struct rw_semaphore *sem),
++	TP_ARGS(sem));
++DECLARE_HOOK(android_vh_rwsem_wake,
++	TP_PROTO(struct rw_semaphore *sem),
++	TP_ARGS(sem));
++DECLARE_HOOK(android_vh_rwsem_write_finished,
++	TP_PROTO(struct rw_semaphore *sem),
++	TP_ARGS(sem));
++DECLARE_HOOK(android_vh_alter_rwsem_list_add,
++	TP_PROTO(struct rwsem_waiter *waiter,
++		 struct rw_semaphore *sem,
++		 bool *already_on_list),
++	TP_ARGS(waiter, sem, already_on_list));
++DECLARE_HOOK(android_vh_rwsem_wake_finish,
++	TP_PROTO(struct rw_semaphore *sem),
++	TP_ARGS(sem));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_RWSEM_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/sched.h b/include/trace/hooks/sched.h
+new file mode 100644
+index 000000000..0844244c9
+--- /dev/null
++++ b/include/trace/hooks/sched.h
+@@ -0,0 +1,397 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM sched
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_SCHED_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SCHED_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct task_struct;
++DECLARE_RESTRICTED_HOOK(android_rvh_select_task_rq_fair,
++	TP_PROTO(struct task_struct *p, int prev_cpu, int sd_flag, int wake_flags, int *new_cpu),
++	TP_ARGS(p, prev_cpu, sd_flag, wake_flags, new_cpu), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_select_task_rq_rt,
++	TP_PROTO(struct task_struct *p, int prev_cpu, int sd_flag, int wake_flags, int *new_cpu),
++	TP_ARGS(p, prev_cpu, sd_flag, wake_flags, new_cpu), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_select_fallback_rq,
++	TP_PROTO(int cpu, struct task_struct *p, int *new_cpu),
++	TP_ARGS(cpu, p, new_cpu), 1);
++
++struct rq;
++DECLARE_HOOK(android_vh_scheduler_tick,
++	TP_PROTO(struct rq *rq),
++	TP_ARGS(rq));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_enqueue_task,
++	TP_PROTO(struct rq *rq, struct task_struct *p, int flags),
++	TP_ARGS(rq, p, flags), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_dequeue_task,
++	TP_PROTO(struct rq *rq, struct task_struct *p, int flags),
++	TP_ARGS(rq, p, flags), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_can_migrate_task,
++	TP_PROTO(struct task_struct *p, int dst_cpu, int *can_migrate),
++	TP_ARGS(p, dst_cpu, can_migrate), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_find_lowest_rq,
++	TP_PROTO(struct task_struct *p, struct cpumask *local_cpu_mask,
++			int ret, int *lowest_cpu),
++	TP_ARGS(p, local_cpu_mask, ret, lowest_cpu), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_prepare_prio_fork,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_finish_prio_fork,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_rtmutex_prepare_setprio,
++	TP_PROTO(struct task_struct *p, struct task_struct *pi_task),
++	TP_ARGS(p, pi_task), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_set_user_nice,
++	TP_PROTO(struct task_struct *p, long *nice, bool *allowed),
++	TP_ARGS(p, nice, allowed), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_setscheduler,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++struct sched_group;
++DECLARE_RESTRICTED_HOOK(android_rvh_find_busiest_group,
++	TP_PROTO(struct sched_group *busiest, struct rq *dst_rq, int *out_balance),
++		TP_ARGS(busiest, dst_rq, out_balance), 1);
++
++DECLARE_HOOK(android_vh_dump_throttled_rt_tasks,
++	TP_PROTO(int cpu, u64 clock, ktime_t rt_period, u64 rt_runtime,
++			s64 rt_period_timer_expires),
++	TP_ARGS(cpu, clock, rt_period, rt_runtime, rt_period_timer_expires));
++
++DECLARE_HOOK(android_vh_jiffies_update,
++	TP_PROTO(void *unused),
++	TP_ARGS(unused));
++
++struct rq_flags;
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_newidle_balance,
++	TP_PROTO(struct rq *this_rq, struct rq_flags *rf,
++		 int *pulled_task, int *done),
++	TP_ARGS(this_rq, rf, pulled_task, done), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_nohz_balancer_kick,
++	TP_PROTO(struct rq *rq, unsigned int *flags, int *done),
++	TP_ARGS(rq, flags, done), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_rebalance_domains,
++	TP_PROTO(struct rq *rq, int *continue_balancing),
++	TP_ARGS(rq, continue_balancing), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_find_busiest_queue,
++	TP_PROTO(int dst_cpu, struct sched_group *group,
++		 struct cpumask *env_cpus, struct rq **busiest,
++		 int *done),
++	TP_ARGS(dst_cpu, group, env_cpus, busiest, done), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_migrate_queued_task,
++	TP_PROTO(struct rq *rq, struct rq_flags *rf,
++		 struct task_struct *p, int new_cpu,
++		 int *detached),
++	TP_ARGS(rq, rf, p, new_cpu, detached), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_resume_cpus,
++	TP_PROTO(struct cpumask *cpus, int *err),
++	TP_ARGS(cpus, err), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_find_energy_efficient_cpu,
++	TP_PROTO(struct task_struct *p, int prev_cpu, int sync, int *new_cpu),
++	TP_ARGS(p, prev_cpu, sync, new_cpu), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_set_iowait,
++	TP_PROTO(struct task_struct *p, int *should_iowait_boost),
++	TP_ARGS(p, should_iowait_boost), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_cpu_overutilized,
++	TP_PROTO(int cpu, int *overutilized),
++	TP_ARGS(cpu, overutilized), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_setaffinity,
++	TP_PROTO(struct task_struct *p, const struct cpumask *in_mask, int *retval),
++	TP_ARGS(p, in_mask, retval), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_update_cpus_allowed,
++	TP_PROTO(struct task_struct *p, cpumask_var_t cpus_requested,
++		 const struct cpumask *new_mask, int *ret),
++	TP_ARGS(p, cpus_requested, new_mask, ret), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_set_task_cpu,
++	TP_PROTO(struct task_struct *p, unsigned int new_cpu),
++	TP_ARGS(p, new_cpu), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_try_to_wake_up,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_try_to_wake_up_success,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_fork,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_wake_up_new_task,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_new_task_stats,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_flush_task,
++	TP_PROTO(struct task_struct *prev),
++	TP_ARGS(prev), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_tick_entry,
++	TP_PROTO(struct rq *rq),
++	TP_ARGS(rq), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_schedule,
++	TP_PROTO(struct task_struct *prev, struct task_struct *next, struct rq *rq),
++	TP_ARGS(prev, next, rq), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_cpu_starting,
++	TP_PROTO(int cpu),
++	TP_ARGS(cpu), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_cpu_dying,
++	TP_PROTO(int cpu),
++	TP_ARGS(cpu), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_account_irq,
++	TP_PROTO(struct task_struct *curr, int cpu, s64 delta),
++	TP_ARGS(curr, cpu, delta), 1);
++
++struct sched_entity;
++DECLARE_RESTRICTED_HOOK(android_rvh_place_entity,
++	TP_PROTO(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial, u64 vruntime),
++	TP_ARGS(cfs_rq, se, initial, vruntime), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_build_perf_domains,
++	TP_PROTO(bool *eas_check),
++	TP_ARGS(eas_check), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_update_cpu_capacity,
++	TP_PROTO(int cpu, unsigned long *capacity),
++	TP_ARGS(cpu, capacity), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_update_misfit_status,
++	TP_PROTO(struct task_struct *p, struct rq *rq, bool *need_update),
++	TP_ARGS(p, rq, need_update), 1);
++
++struct cgroup_taskset;
++DECLARE_RESTRICTED_HOOK(android_rvh_cpu_cgroup_attach,
++	TP_PROTO(struct cgroup_taskset *tset),
++	TP_ARGS(tset), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_cpu_cgroup_can_attach,
++	TP_PROTO(struct cgroup_taskset *tset, int *retval),
++	TP_ARGS(tset, retval), 1);
++
++struct cgroup_subsys_state;
++DECLARE_RESTRICTED_HOOK(android_rvh_cpu_cgroup_online,
++	TP_PROTO(struct cgroup_subsys_state *css),
++	TP_ARGS(css), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_fork_init,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_ttwu_cond,
++	TP_PROTO(bool *cond),
++	TP_ARGS(cond), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_schedule_bug,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_exec,
++	TP_PROTO(bool *cond),
++	TP_ARGS(cond), 1);
++
++struct cpufreq_policy;
++DECLARE_HOOK(android_vh_map_util_freq,
++	TP_PROTO(unsigned long util, unsigned long freq,
++		unsigned long cap, unsigned long *next_freq, struct cpufreq_policy *policy,
++		bool *need_freq_update),
++	TP_ARGS(util, freq, cap, next_freq, policy, need_freq_update));
++
++struct em_perf_domain;
++DECLARE_HOOK(android_vh_em_cpu_energy,
++	TP_PROTO(struct em_perf_domain *pd,
++		unsigned long max_util, unsigned long sum_util,
++		unsigned long *energy),
++	TP_ARGS(pd, max_util, sum_util, energy));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_sched_balance_rt,
++	TP_PROTO(struct rq *rq, struct task_struct *p, int *done),
++	TP_ARGS(rq, p, done), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_dequeue_task_idle,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p), 1);
++
++struct cfs_rq;
++DECLARE_RESTRICTED_HOOK(android_rvh_pick_next_entity,
++	TP_PROTO(struct cfs_rq *cfs_rq, struct sched_entity *curr,
++		 struct sched_entity **se),
++	TP_ARGS(cfs_rq, curr, se), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_check_preempt_wakeup,
++	TP_PROTO(struct rq *rq, struct task_struct *p, bool *preempt, bool *nopreempt,
++			int wake_flags, struct sched_entity *se, struct sched_entity *pse,
++			int next_buddy_marked, unsigned int granularity),
++	TP_ARGS(rq, p, preempt, nopreempt, wake_flags, se, pse, next_buddy_marked,
++			granularity), 1);
++
++DECLARE_HOOK(android_vh_do_wake_up_sync,
++	TP_PROTO(struct wait_queue_head *wq_head, int *done),
++	TP_ARGS(wq_head, done));
++
++DECLARE_HOOK(android_vh_set_wake_flags,
++	TP_PROTO(int *wake_flags, unsigned int *mode),
++	TP_ARGS(wake_flags, mode));
++
++enum uclamp_id;
++struct uclamp_se;
++DECLARE_RESTRICTED_HOOK(android_rvh_uclamp_eff_get,
++	TP_PROTO(struct task_struct *p, enum uclamp_id clamp_id,
++		 struct uclamp_se *uclamp_max, struct uclamp_se *uclamp_eff, int *ret),
++	TP_ARGS(p, clamp_id, uclamp_max, uclamp_eff, ret), 1);
++
++DECLARE_HOOK(android_vh_build_sched_domains,
++	TP_PROTO(bool has_asym),
++	TP_ARGS(has_asym));
++DECLARE_RESTRICTED_HOOK(android_rvh_check_preempt_tick,
++	TP_PROTO(struct task_struct *p, unsigned long *ideal_runtime, bool *skip_preempt,
++			unsigned long delta_exec, struct cfs_rq *cfs_rq, struct sched_entity *curr,
++			unsigned int granularity),
++	TP_ARGS(p, ideal_runtime, skip_preempt, delta_exec, cfs_rq, curr, granularity), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_check_preempt_wakeup_ignore,
++	TP_PROTO(struct task_struct *p, bool *ignore),
++	TP_ARGS(p, ignore), 1);
++DECLARE_RESTRICTED_HOOK(android_rvh_replace_next_task_fair,
++	TP_PROTO(struct rq *rq, struct task_struct **p, struct sched_entity **se, bool *repick,
++			bool simple, struct task_struct *prev),
++	TP_ARGS(rq, p, se, repick, simple, prev), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_do_sched_yield,
++	TP_PROTO(struct rq *rq),
++	TP_ARGS(rq), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_util_est_update,
++	TP_PROTO(struct cfs_rq *cfs_rq, struct task_struct *p, bool task_sleep, int *ret),
++	TP_ARGS(cfs_rq, p, task_sleep, ret), 1);
++
++DECLARE_HOOK(android_vh_account_task_time,
++	TP_PROTO(struct task_struct *p, struct rq *rq, int user_tick),
++	TP_ARGS(p, rq, user_tick));
++
++DECLARE_HOOK(android_vh_irqtime_account_process_tick,
++	TP_PROTO(struct task_struct *p, struct rq *rq, int user_tick, int ticks),
++	TP_ARGS(p, rq, user_tick, ticks));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_post_init_entity_util_avg,
++	TP_PROTO(struct sched_entity *se),
++	TP_ARGS(se), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_set_cpus_allowed_comm,
++	TP_PROTO(struct task_struct *p, const struct cpumask *new_mask),
++	TP_ARGS(p, new_mask), 1);
++
++DECLARE_HOOK(android_vh_sched_setaffinity_early,
++	TP_PROTO(struct task_struct *p, const struct cpumask *new_mask, int *retval),
++	TP_ARGS(p, new_mask, retval));
++
++DECLARE_HOOK(android_vh_free_task,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_after_enqueue_task,
++	TP_PROTO(struct rq *rq, struct task_struct *p),
++	TP_ARGS(rq, p), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_after_dequeue_task,
++	TP_PROTO(struct rq *rq, struct task_struct *p),
++	TP_ARGS(rq, p), 1);
++
++struct cfs_rq;
++struct sched_entity;
++struct rq_flags;
++DECLARE_RESTRICTED_HOOK(android_rvh_enqueue_entity,
++	TP_PROTO(struct cfs_rq *cfs, struct sched_entity *se),
++	TP_ARGS(cfs, se), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_dequeue_entity,
++	TP_PROTO(struct cfs_rq *cfs, struct sched_entity *se),
++	TP_ARGS(cfs, se), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_entity_tick,
++	TP_PROTO(struct cfs_rq *cfs_rq, struct sched_entity *se),
++	TP_ARGS(cfs_rq, se), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_enqueue_task_fair,
++	TP_PROTO(struct rq *rq, struct task_struct *p, int flags),
++	TP_ARGS(rq, p, flags), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_dequeue_task_fair,
++	TP_PROTO(struct rq *rq, struct task_struct *p, int flags),
++	TP_ARGS(rq, p, flags), 1);
++
++DECLARE_HOOK(android_vh_prepare_update_load_avg_se,
++	TP_PROTO(struct sched_entity *se, int flags),
++	TP_ARGS(se, flags));
++
++DECLARE_HOOK(android_vh_sched_stat_runtime_rt,
++	TP_PROTO(struct task_struct *tsk, u64 delta),
++	TP_ARGS(tsk, delta));
++
++DECLARE_HOOK(android_vh_finish_update_load_avg_se,
++	TP_PROTO(struct sched_entity *se, int flags),
++	TP_ARGS(se, flags));
++
++DECLARE_HOOK(android_vh_dup_task_struct,
++	TP_PROTO(struct task_struct *tsk, struct task_struct *orig),
++	TP_ARGS(tsk, orig));
++
++DECLARE_HOOK(android_vh_set_task_comm,
++	TP_PROTO(struct task_struct *p),
++	TP_ARGS(p));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_find_new_ilb,
++	TP_PROTO(struct cpumask *nohz_idle_cpus_mask, int *ilb),
++	TP_ARGS(nohz_idle_cpus_mask, ilb), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_force_compatible_pre,
++	TP_PROTO(void *unused),
++	TP_ARGS(unused), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_force_compatible_post,
++	TP_PROTO(void *unused),
++	TP_ARGS(unused), 1);
++
++DECLARE_HOOK(android_vh_setscheduler_uclamp,
++	TP_PROTO(struct task_struct *tsk, int clamp_id, unsigned int value),
++	TP_ARGS(tsk, clamp_id, value));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_SCHED_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/scmi.h b/include/trace/hooks/scmi.h
+new file mode 100644
+index 000000000..ea2db9f07
+--- /dev/null
++++ b/include/trace/hooks/scmi.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM scmi
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_SCMI_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SCMI_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_scmi_timeout_sync,
++	TP_PROTO(int *timeout),
++	TP_ARGS(timeout));
++
++#endif /* _TRACE_HOOK_SCMI_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/selinux.h b/include/trace/hooks/selinux.h
+new file mode 100644
+index 000000000..2ad6484d2
+--- /dev/null
++++ b/include/trace/hooks/selinux.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM selinux
++
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_SELINUX_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SELINUX_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct selinux_state;
++DECLARE_HOOK(android_vh_selinux_is_initialized,
++	TP_PROTO(const struct selinux_state *state),
++	TP_ARGS(state));
++
++#endif /* _TRACE_HOOK_SELINUX_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/shmem_fs.h b/include/trace/hooks/shmem_fs.h
+new file mode 100644
+index 000000000..08e630330
+--- /dev/null
++++ b/include/trace/hooks/shmem_fs.h
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM shmem_fs
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_SHMEM_FS_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SHMEM_FS_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct page;
++DECLARE_HOOK(android_vh_shmem_alloc_page,
++	TP_PROTO(struct page **page),
++	TP_ARGS(page));
++#endif /* _TRACE_HOOK_SHMEM_FS_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/signal.h b/include/trace/hooks/signal.h
+new file mode 100644
+index 000000000..a0db2e8cf
+--- /dev/null
++++ b/include/trace/hooks/signal.h
+@@ -0,0 +1,20 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM signal
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_SIGNAL_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SIGNAL_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct task_struct;
++DECLARE_HOOK(android_vh_do_send_sig_info,
++	TP_PROTO(int sig, struct task_struct *killer, struct task_struct *dst),
++	TP_ARGS(sig, killer, dst));
++DECLARE_HOOK(android_vh_process_killed,
++	TP_PROTO(struct task_struct *task, bool *reap),
++	TP_ARGS(task, reap));
++#endif /* _TRACE_HOOK_SIGNAL_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/snd_compr.h b/include/trace/hooks/snd_compr.h
+new file mode 100644
+index 000000000..c42ed8d6b
+--- /dev/null
++++ b/include/trace/hooks/snd_compr.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM snd_compr
++
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_SND_COMPR_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SND_COMPR_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++
++DECLARE_HOOK(android_vh_snd_compr_use_pause_in_drain,
++	TP_PROTO(bool *use_pause_in_drain, bool *leave_draining),
++	TP_ARGS(use_pause_in_drain, leave_draining));
++
++#endif /* _TRACE_HOOK_SND_COMPR_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
++
+diff --git a/include/trace/hooks/softlockup.h b/include/trace/hooks/softlockup.h
+new file mode 100644
+index 000000000..9294913f9
+--- /dev/null
++++ b/include/trace/hooks/softlockup.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM softlockup
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_SOFTLOCKUP_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SOFTLOCKUP_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct pt_regs;
++DECLARE_HOOK(android_vh_watchdog_timer_softlockup,
++	TP_PROTO(int duration, struct pt_regs *regs, bool is_panic),
++	TP_ARGS(duration, regs, is_panic));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_SOFTLOCKUP_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/sound.h b/include/trace/hooks/sound.h
+new file mode 100644
+index 000000000..6eb8bc326
+--- /dev/null
++++ b/include/trace/hooks/sound.h
+@@ -0,0 +1,24 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM sound
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_SOUND_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SOUND_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++#include <linux/usb.h>
++
++DECLARE_HOOK(android_vh_sound_usb_support_cpu_suspend,
++	TP_PROTO(struct usb_device *udev,
++		int direction,
++		bool *is_support),
++	TP_ARGS(udev, direction, is_support));
++
++DECLARE_HOOK(android_vh_snd_soc_card_get_comp_chain,
++	TP_PROTO(bool *component_chaining),
++	TP_ARGS(component_chaining));
++
++#endif /* _TRACE_HOOK_SOUND_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/sys.h b/include/trace/hooks/sys.h
+new file mode 100644
+index 000000000..9e5d7a5cb
+--- /dev/null
++++ b/include/trace/hooks/sys.h
+@@ -0,0 +1,17 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM sys
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_SYS_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SYS_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct task_struct;
++DECLARE_HOOK(android_vh_syscall_prctl_finished,
++	TP_PROTO(int option, struct task_struct *task),
++	TP_ARGS(option, task));
++#endif
++
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/syscall_check.h b/include/trace/hooks/syscall_check.h
+new file mode 100644
+index 000000000..d39802aa4
+--- /dev/null
++++ b/include/trace/hooks/syscall_check.h
+@@ -0,0 +1,31 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM syscall_check
++
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_SYSCALL_CHECK_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SYSCALL_CHECK_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct file;
++union bpf_attr;
++DECLARE_HOOK(android_vh_check_mmap_file,
++	TP_PROTO(const struct file *file, unsigned long prot,
++		unsigned long flag, unsigned long ret),
++	TP_ARGS(file, prot, flag, ret));
++
++DECLARE_HOOK(android_vh_check_file_open,
++	TP_PROTO(const struct file *file),
++	TP_ARGS(file));
++
++DECLARE_HOOK(android_vh_check_bpf_syscall,
++	TP_PROTO(int cmd, const union bpf_attr *attr, unsigned int size),
++	TP_ARGS(cmd, attr, size));
++
++#endif /* _TRACE_HOOK_SYSCALL_CHECK_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/sysrqcrash.h b/include/trace/hooks/sysrqcrash.h
+new file mode 100644
+index 000000000..d163f898a
+--- /dev/null
++++ b/include/trace/hooks/sysrqcrash.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM sysrqcrash
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_SYSRQCRASH_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_SYSRQCRASH_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++DECLARE_HOOK(android_vh_sysrq_crash,
++	TP_PROTO(void *data),
++	TP_ARGS(data));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_SYSRQCRASH_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/thermal.h b/include/trace/hooks/thermal.h
+new file mode 100644
+index 000000000..944454ca0
+--- /dev/null
++++ b/include/trace/hooks/thermal.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM thermal
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_THERMAL_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_THERMAL_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_enable_thermal_genl_check,
++	TP_PROTO(int event, int tz_id, int *enable_thermal_genl),
++	TP_ARGS(event, tz_id, enable_thermal_genl));
++
++struct thermal_zone_device;
++DECLARE_HOOK(android_vh_thermal_pm_notify_suspend,
++	     TP_PROTO(struct thermal_zone_device *tz, int *irq_wakeable),
++	     TP_ARGS(tz, irq_wakeable));
++
++#endif /* _TRACE_HOOK_THERMAL_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
++
+diff --git a/include/trace/hooks/timer.h b/include/trace/hooks/timer.h
+new file mode 100644
+index 000000000..174d958e4
+--- /dev/null
++++ b/include/trace/hooks/timer.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM timer
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_TIMER_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_TIMER_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_timer_calc_index,
++	TP_PROTO(unsigned int lvl, unsigned long *expires),
++	TP_ARGS(lvl, expires));
++
++#endif /* _TRACE_HOOK_TIMER_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/topology.h b/include/trace/hooks/topology.h
+new file mode 100644
+index 000000000..740140271
+--- /dev/null
++++ b/include/trace/hooks/topology.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM topology
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_TOPOLOGY_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_TOPOLOGY_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++#include <linux/cpumask.h>
++
++DECLARE_HOOK(android_vh_arch_set_freq_scale,
++	TP_PROTO(const struct cpumask *cpus, unsigned long freq,
++		 unsigned long max, unsigned long *scale),
++	TP_ARGS(cpus, freq, max, scale));
++
++DECLARE_HOOK(android_vh_update_topology_flags_workfn,
++	TP_PROTO(void *unused),
++	TP_ARGS(unused));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_TOPOLOGY_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/traps.h b/include/trace/hooks/traps.h
+new file mode 100644
+index 000000000..f8d56a207
+--- /dev/null
++++ b/include/trace/hooks/traps.h
+@@ -0,0 +1,42 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM traps
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_TRAPS_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_TRAPS_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct pt_regs;
++DECLARE_RESTRICTED_HOOK(android_rvh_do_undefinstr,
++	TP_PROTO(struct pt_regs *regs, bool user),
++	TP_ARGS(regs, user),
++	TP_CONDITION(!user));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_do_bti,
++	TP_PROTO(struct pt_regs *regs, bool user),
++	TP_ARGS(regs, user),
++	TP_CONDITION(!user));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_do_ptrauth_fault,
++	TP_PROTO(struct pt_regs *regs, unsigned int esr, bool user),
++	TP_ARGS(regs, esr, user),
++	TP_CONDITION(!user));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_bad_mode,
++	TP_PROTO(struct pt_regs *regs, unsigned int esr, int reason),
++	TP_ARGS(regs, reason, esr), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_arm64_serror_panic,
++	TP_PROTO(struct pt_regs *regs, unsigned int esr),
++	TP_ARGS(regs, esr), 1);
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_TRAPS_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/typec.h b/include/trace/hooks/typec.h
+new file mode 100644
+index 000000000..f87151124
+--- /dev/null
++++ b/include/trace/hooks/typec.h
+@@ -0,0 +1,67 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM typec
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_TYPEC_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_TYPEC_H
++#include <linux/tracepoint.h>
++#include <linux/usb/pd.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct tcpci;
++struct tcpci_data;
++struct tcpm_port;
++
++#ifndef TYPEC_TIMER
++#define TYPEC_TIMER
++enum typec_timer {
++	SINK_WAIT_CAP,
++	SOURCE_OFF,
++	CC_DEBOUNCE,
++	SINK_DISCOVERY_BC12,
++};
++#endif
++
++DECLARE_HOOK(android_vh_typec_tcpci_override_toggling,
++	TP_PROTO(struct tcpci *tcpci, struct tcpci_data *data, int *override_toggling),
++	TP_ARGS(tcpci, data, override_toggling));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_typec_tcpci_chk_contaminant,
++	TP_PROTO(struct tcpci *tcpci, struct tcpci_data *data, int *ret),
++	TP_ARGS(tcpci, data, ret), 1);
++
++/*
++ * This hook is for addressing hardware anomalies where TCPC_POWER_STATUS_VBUS_PRES bit can return 0
++ * even before falling below sSinkDisconnect threshold.
++ * Handler has to set bypass to override the value that would otherwise be returned by this
++ * function.
++ * Handler can set vbus or clear vbus to indicate vbus present or absent
++ */
++DECLARE_RESTRICTED_HOOK(android_rvh_typec_tcpci_get_vbus,
++	TP_PROTO(struct tcpci *tcpci, struct tcpci_data *data, int *vbus, int *bypass),
++	TP_ARGS(tcpci, data, vbus, bypass), 1);
++
++DECLARE_HOOK(android_vh_typec_tcpm_get_timer,
++	TP_PROTO(const char *state, enum typec_timer timer, unsigned int *msecs),
++	TP_ARGS(state, timer, msecs));
++
++DECLARE_HOOK(android_vh_typec_store_partner_src_caps,
++	TP_PROTO(struct tcpm_port *port, unsigned int *nr_source_caps,
++		 u32 (*source_caps)[PDO_MAX_OBJECTS]),
++	TP_ARGS(port, nr_source_caps, source_caps));
++
++DECLARE_HOOK(android_vh_typec_tcpm_adj_current_limit,
++	TP_PROTO(const char *state, u32 port_current_limit, u32 port_voltage, bool pd_capable,
++		  u32 *current_limit, bool *adjust),
++	TP_ARGS(state, port_current_limit, port_voltage, pd_capable, current_limit, adjust));
++
++DECLARE_HOOK(android_vh_typec_tcpm_log,
++	TP_PROTO(const char *log, bool *bypass),
++	TP_ARGS(log, bypass));
++
++#endif /* _TRACE_HOOK_UFSHCD_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/ufshcd.h b/include/trace/hooks/ufshcd.h
+new file mode 100644
+index 000000000..744a1db41
+--- /dev/null
++++ b/include/trace/hooks/ufshcd.h
+@@ -0,0 +1,71 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM ufshcd
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_UFSHCD_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_UFSHCD_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct ufs_hba;
++struct request;
++struct ufshcd_lrb;
++
++DECLARE_HOOK(android_vh_ufs_fill_prdt,
++	TP_PROTO(struct ufs_hba *hba, struct ufshcd_lrb *lrbp,
++		 unsigned int segments, int *err),
++	TP_ARGS(hba, lrbp, segments, err));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_ufs_complete_init,
++			TP_PROTO(struct ufs_hba *hba),
++			TP_ARGS(hba), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_ufs_reprogram_all_keys,
++			TP_PROTO(struct ufs_hba *hba, int *err),
++			TP_ARGS(hba, err), 1);
++
++DECLARE_HOOK(android_vh_ufs_prepare_command,
++	TP_PROTO(struct ufs_hba *hba, struct request *rq,
++		 struct ufshcd_lrb *lrbp, int *err),
++	TP_ARGS(hba, rq, lrbp, err));
++
++DECLARE_HOOK(android_vh_ufs_update_sysfs,
++	TP_PROTO(struct ufs_hba *hba),
++	TP_ARGS(hba));
++
++DECLARE_HOOK(android_vh_ufs_send_command,
++	TP_PROTO(struct ufs_hba *hba, struct ufshcd_lrb *lrbp),
++	TP_ARGS(hba, lrbp));
++
++DECLARE_HOOK(android_vh_ufs_compl_command,
++	TP_PROTO(struct ufs_hba *hba, struct ufshcd_lrb *lrbp),
++	TP_ARGS(hba, lrbp));
++
++struct uic_command;
++DECLARE_HOOK(android_vh_ufs_send_uic_command,
++	TP_PROTO(struct ufs_hba *hba, struct uic_command *ucmd,
++		 const char *str),
++	TP_ARGS(hba, ucmd, str));
++
++DECLARE_HOOK(android_vh_ufs_send_tm_command,
++	TP_PROTO(struct ufs_hba *hba, int tag, const char *str),
++	TP_ARGS(hba, tag, str));
++
++DECLARE_HOOK(android_vh_ufs_check_int_errors,
++	TP_PROTO(struct ufs_hba *hba, bool queue_eh_work),
++	TP_ARGS(hba, queue_eh_work));
++
++struct scsi_device;
++DECLARE_HOOK(android_vh_ufs_update_sdev,
++	TP_PROTO(struct scsi_device *sdev),
++	TP_ARGS(sdev));
++
++DECLARE_HOOK(android_vh_ufs_clock_scaling,
++	TP_PROTO(struct ufs_hba *hba, bool *force_out, bool *force_scaling, bool *scale_up),
++	TP_ARGS(hba, force_out, force_scaling, scale_up));
++#endif /* _TRACE_HOOK_UFSHCD_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/usb.h b/include/trace/hooks/usb.h
+new file mode 100644
+index 000000000..f84594730
+--- /dev/null
++++ b/include/trace/hooks/usb.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM usb
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_USB_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_USB_H
++#include <linux/tracepoint.h>
++#include <linux/usb.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++
++DECLARE_HOOK(android_vh_usb_dev_suspend,
++	TP_PROTO(struct usb_device *udev, pm_message_t msg, int *bypass),
++	TP_ARGS(udev, msg, bypass));
++
++DECLARE_HOOK(android_vh_usb_dev_resume,
++	TP_PROTO(struct usb_device *udev, pm_message_t msg, int *bypass),
++	TP_ARGS(udev, msg, bypass));
++
++#endif /* _TRACE_HOOK_USB_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
++
+diff --git a/include/trace/hooks/user.h b/include/trace/hooks/user.h
+new file mode 100644
+index 000000000..b5b507ccd
+--- /dev/null
++++ b/include/trace/hooks/user.h
+@@ -0,0 +1,23 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM user
++#undef TRACE_INCLUDE_PATH
++#define TRACE_INCLUDE_PATH trace/hooks
++#if !defined(_TRACE_HOOK_USER_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_USER_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct user_struct;
++DECLARE_HOOK(android_vh_alloc_uid,
++	TP_PROTO(struct user_struct *user),
++	TP_ARGS(user));
++
++DECLARE_HOOK(android_vh_free_user,
++	TP_PROTO(struct user_struct *up),
++	TP_ARGS(up));
++
++#endif /* _TRACE_HOOK_USER_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
++
+diff --git a/include/trace/hooks/v4l2core.h b/include/trace/hooks/v4l2core.h
+new file mode 100644
+index 000000000..7207810a7
+--- /dev/null
++++ b/include/trace/hooks/v4l2core.h
+@@ -0,0 +1,65 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM v4l2core
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_V4L2CORE_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_V4L2CORE_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct v4l2_format;
++DECLARE_HOOK(android_vh_clear_reserved_fmt_fields,
++	TP_PROTO(struct v4l2_format *fmt, int *ret),
++	TP_ARGS(fmt, ret));
++
++struct v4l2_fmtdesc;
++DECLARE_HOOK(android_vh_fill_ext_fmtdesc,
++	TP_PROTO(struct v4l2_fmtdesc *fmtd, const char **descr),
++	TP_ARGS(fmtd, descr));
++
++DECLARE_HOOK(android_vh_clear_mask_adjust,
++	TP_PROTO(unsigned int ctrl, int *n),
++	TP_ARGS(ctrl, n));
++
++struct v4l2_subdev;
++struct v4l2_subdev_pad_config;
++struct v4l2_subdev_selection;
++DECLARE_HOOK(android_vh_v4l2subdev_set_selection,
++	TP_PROTO(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config *pad,
++	struct v4l2_subdev_selection *sel, int *ret),
++	TP_ARGS(sd, pad, sel, ret));
++
++struct v4l2_subdev_format;
++DECLARE_HOOK(android_vh_v4l2subdev_set_fmt,
++	TP_PROTO(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config *pad,
++	struct v4l2_subdev_format *format, int *ret),
++	TP_ARGS(sd, pad, format, ret));
++
++struct v4l2_subdev_frame_interval;
++DECLARE_HOOK(android_vh_v4l2subdev_set_frame_interval,
++	TP_PROTO(struct v4l2_subdev *sd, struct v4l2_subdev_frame_interval *fi,
++	int *ret),
++	TP_ARGS(sd, fi, ret));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_v4l2subdev_set_selection,
++	TP_PROTO(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config *pad,
++	struct v4l2_subdev_selection *sel, int *ret),
++	TP_ARGS(sd, pad, sel, ret), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_v4l2subdev_set_fmt,
++	TP_PROTO(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config *pad,
++	struct v4l2_subdev_format *format, int *ret),
++	TP_ARGS(sd, pad, format, ret), 1);
++
++DECLARE_RESTRICTED_HOOK(android_rvh_v4l2subdev_set_frame_interval,
++	TP_PROTO(struct v4l2_subdev *sd, struct v4l2_subdev_frame_interval *fi,
++	int *ret),
++	TP_ARGS(sd, fi, ret), 1);
++
++#endif /* _TRACE_HOOK_V4L2CORE_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
++
+diff --git a/include/trace/hooks/v4l2mc.h b/include/trace/hooks/v4l2mc.h
+new file mode 100644
+index 000000000..0f60515bb
+--- /dev/null
++++ b/include/trace/hooks/v4l2mc.h
+@@ -0,0 +1,27 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM v4l2mc
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_V4L2MC_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_V4L2MC_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++struct media_link;
++struct media_link_desc;
++DECLARE_HOOK(android_vh_media_device_setup_link,
++	TP_PROTO(struct media_link *link, struct media_link_desc *linkd, int *ret),
++	TP_ARGS(link, linkd, ret));
++
++DECLARE_RESTRICTED_HOOK(android_rvh_media_device_setup_link,
++	TP_PROTO(struct media_link *link,
++	struct media_link_desc *linkd, int *ret),
++	TP_ARGS(link, linkd, ret), 1);
++
++#endif /* _TRACE_HOOK_V4L2MC_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
++
+diff --git a/include/trace/hooks/vendor_hooks.h b/include/trace/hooks/vendor_hooks.h
+new file mode 100644
+index 000000000..87fe9ccdc
+--- /dev/null
++++ b/include/trace/hooks/vendor_hooks.h
+@@ -0,0 +1,114 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++/*
++ * Note: we intentionally omit include file ifdef protection
++ *  This is due to the way trace events work. If a file includes two
++ *  trace event headers under one "CREATE_TRACE_POINTS" the first include
++ *  will override the DECLARE_RESTRICTED_HOOK and break the second include.
++ */
++
++#include <linux/tracepoint.h>
++
++#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_ANDROID_VENDOR_HOOKS)
++
++#define DECLARE_HOOK DECLARE_TRACE
++
++int android_rvh_probe_register(struct tracepoint *tp, void *probe, void *data);
++
++#ifdef TRACE_HEADER_MULTI_READ
++
++#define DEFINE_HOOK_FN(_name, _reg, _unreg, proto, args)		\
++	static const char __tpstrtab_##_name[]				\
++	__section("__tracepoints_strings") = #_name;			\
++	extern struct static_call_key STATIC_CALL_KEY(tp_func_##_name);	\
++	int __traceiter_##_name(void *__data, proto);			\
++	struct tracepoint __tracepoint_##_name	__used			\
++	__section("__tracepoints") = {					\
++		.name = __tpstrtab_##_name,				\
++		.key = STATIC_KEY_INIT_FALSE,				\
++		.static_call_key = &STATIC_CALL_KEY(tp_func_##_name),	\
++		.static_call_tramp = STATIC_CALL_TRAMP_ADDR(tp_func_##_name), \
++		.iterator = &__traceiter_##_name,			\
++		.regfunc = _reg,					\
++		.unregfunc = _unreg,					\
++		.funcs = NULL };					\
++	__TRACEPOINT_ENTRY(_name);					\
++	int __nocfi __traceiter_##_name(void *__data, proto)			\
++	{								\
++		struct tracepoint_func *it_func_ptr;			\
++		void *it_func;						\
++									\
++		it_func_ptr = (&__tracepoint_##_name)->funcs;		\
++		it_func = (it_func_ptr)->func;				\
++		do {							\
++			__data = (it_func_ptr)->data;			\
++			((void(*)(void *, proto))(it_func))(__data, args); \
++			it_func = READ_ONCE((++it_func_ptr)->func);	\
++		} while (it_func);					\
++		return 0;						\
++	}								\
++	DEFINE_STATIC_CALL(tp_func_##_name, __traceiter_##_name);
++
++#undef DECLARE_RESTRICTED_HOOK
++#define DECLARE_RESTRICTED_HOOK(name, proto, args, cond) \
++	DEFINE_HOOK_FN(name, NULL, NULL, PARAMS(proto), PARAMS(args))
++
++/* prevent additional recursion */
++#undef TRACE_HEADER_MULTI_READ
++#else /* TRACE_HEADER_MULTI_READ */
++
++#define DO_HOOK(name, proto, args, cond)				\
++	do {								\
++		struct tracepoint_func *it_func_ptr;			\
++		void *__data;						\
++									\
++		if (!(cond))						\
++			return;						\
++									\
++		it_func_ptr = (&__tracepoint_##name)->funcs;		\
++		if (it_func_ptr) {					\
++			__data = (it_func_ptr)->data;			\
++			__DO_TRACE_CALL(name)(args);			\
++		}							\
++	} while (0)
++
++#define __DECLARE_HOOK(name, proto, args, cond, data_proto, data_args)	\
++	extern int __traceiter_##name(data_proto);			\
++	DECLARE_STATIC_CALL(tp_func_##name, __traceiter_##name);	\
++	extern struct tracepoint __tracepoint_##name;			\
++	static inline void __nocfi trace_##name(proto)			\
++	{								\
++		if (static_key_false(&__tracepoint_##name.key))		\
++			DO_HOOK(name,					\
++				TP_PROTO(data_proto),			\
++				TP_ARGS(data_args),			\
++				TP_CONDITION(cond));			\
++	}								\
++	static inline bool						\
++	trace_##name##_enabled(void)					\
++	{								\
++		return static_key_false(&__tracepoint_##name.key);	\
++	}								\
++	static inline int						\
++	register_trace_##name(void (*probe)(data_proto), void *data) 	\
++	{								\
++		return android_rvh_probe_register(&__tracepoint_##name,	\
++						  (void *)probe, data);	\
++	}								\
++	/* vendor hooks cannot be unregistered */			\
++
++#undef DECLARE_RESTRICTED_HOOK
++#define DECLARE_RESTRICTED_HOOK(name, proto, args, cond)		\
++	__DECLARE_HOOK(name, PARAMS(proto), PARAMS(args),		\
++			cond,						\
++			PARAMS(void *__data, proto),			\
++			PARAMS(__data, args))
++
++#endif /* TRACE_HEADER_MULTI_READ */
++
++#else /* !CONFIG_TRACEPOINTS || !CONFIG_ANDROID_VENDOR_HOOKS */
++/* suppress trace hooks */
++#define DECLARE_HOOK DECLARE_EVENT_NOP
++#define DECLARE_RESTRICTED_HOOK(name, proto, args, cond)		\
++	DECLARE_EVENT_NOP(name, PARAMS(proto), PARAMS(args))
++#endif
+diff --git a/include/trace/hooks/vmscan.h b/include/trace/hooks/vmscan.h
+new file mode 100644
+index 000000000..b6b77d989
+--- /dev/null
++++ b/include/trace/hooks/vmscan.h
+@@ -0,0 +1,33 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM vmscan
++
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_VMSCAN_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_VMSCAN_H
++
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++
++DECLARE_HOOK(android_vh_tune_scan_type,
++	TP_PROTO(char *scan_type),
++	TP_ARGS(scan_type));
++DECLARE_HOOK(android_vh_tune_swappiness,
++	TP_PROTO(int *swappiness),
++	TP_ARGS(swappiness));
++DECLARE_HOOK(android_vh_shrink_slab_bypass,
++	TP_PROTO(gfp_t gfp_mask, int nid, struct mem_cgroup *memcg, int priority, bool *bypass),
++	TP_ARGS(gfp_mask, nid, memcg, priority, bypass));
++DECLARE_HOOK(android_vh_tune_inactive_ratio,
++	TP_PROTO(unsigned long *inactive_ratio, int file),
++	TP_ARGS(inactive_ratio, file))
++DECLARE_HOOK(android_vh_do_shrink_slab,
++	TP_PROTO(struct shrinker *shrinker, struct shrink_control *shrinkctl, int priority),
++	TP_ARGS(shrinker, shrinkctl, priority));
++DECLARE_RESTRICTED_HOOK(android_rvh_set_balance_anon_file_reclaim,
++			TP_PROTO(bool *balance_anon_file_reclaim),
++			TP_ARGS(balance_anon_file_reclaim), 1);
++#endif /* _TRACE_HOOK_VMSCAN_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/workqueue.h b/include/trace/hooks/workqueue.h
+new file mode 100644
+index 000000000..0ffe56433
+--- /dev/null
++++ b/include/trace/hooks/workqueue.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM workqueue
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_WORKQUEUE_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_WORKQUEUE_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++struct worker;
++DECLARE_HOOK(android_vh_create_worker,
++	TP_PROTO(struct worker *worker, struct workqueue_attrs *attrs),
++	TP_ARGS(worker, attrs));
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_WORKQUEUE_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/trace/hooks/wqlockup.h b/include/trace/hooks/wqlockup.h
+new file mode 100644
+index 000000000..21e23ad6b
+--- /dev/null
++++ b/include/trace/hooks/wqlockup.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#undef TRACE_SYSTEM
++#define TRACE_SYSTEM wqlockup
++#define TRACE_INCLUDE_PATH trace/hooks
++
++#if !defined(_TRACE_HOOK_WQLOCKUP_H) || defined(TRACE_HEADER_MULTI_READ)
++#define _TRACE_HOOK_WQLOCKUP_H
++#include <linux/tracepoint.h>
++#include <trace/hooks/vendor_hooks.h>
++/*
++ * Following tracepoints are not exported in tracefs and provide a
++ * mechanism for vendor modules to hook and extend functionality
++ */
++DECLARE_HOOK(android_vh_wq_lockup_pool,
++	TP_PROTO(int cpu, unsigned long pool_ts),
++	TP_ARGS(cpu, pool_ts));
++
++/* macro versions of hooks are no longer required */
++
++#endif /* _TRACE_HOOK_WQLOCKUP_H */
++/* This part must be outside protection */
++#include <trace/define_trace.h>
+diff --git a/include/uapi/linux/rk-iomux.h b/include/uapi/linux/rk-iomux.h
+new file mode 100644
+index 000000000..58da85c9c
+--- /dev/null
++++ b/include/uapi/linux/rk-iomux.h
+@@ -0,0 +1,20 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++
++#ifndef _UAPI_LINUX_RK_IOMUX_H
++#define _UAPI_LINUX_RK_IOMUX_H
++
++#include <linux/ioctl.h>
++#include <linux/types.h>
++
++struct iomux_ioctl_data {
++	__u32 bank;
++	__u32 pin;
++	__u32 mux;
++};
++
++#define IOMUX_IOC_MAGIC		'P'
++
++#define IOMUX_IOC_MUX_SET	_IOWR(IOMUX_IOC_MAGIC, 0, struct iomux_ioctl_data)
++#define IOMUX_IOC_MUX_GET	_IOWR(IOMUX_IOC_MAGIC, 1, struct iomux_ioctl_data)
++
++#endif
+-- 
+2.34.1
+
