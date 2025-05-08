@@ -38,7 +38,8 @@ fit-dtb.blob
 /System.map
 /u-boot*
 /boards.cfg
-
+/bl31_*
+/tee.bin*
 #
 # git files that we don't want to ignore even it they are dot-files
 #

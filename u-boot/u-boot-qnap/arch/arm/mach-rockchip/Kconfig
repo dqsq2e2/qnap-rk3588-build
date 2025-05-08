@@ -990,6 +990,13 @@ config ROCKCHIP_HOTKEY
 	help
 	  Define a lot of hotkeys for debug.
 
+config ENABLE_BL32_FOR_SPECIFIC_BOARDS
+	bool "Enable BL32 for specific board types"
+	default n
+	help
+	  This enables BL32 node generation only for designated board types.
+	  If unsure, leave this disabled.
+
 config ROCKCHIP_CMD
 	string "Rockchip specific command"
 	default ""
