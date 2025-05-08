@@ -1,0 +1,54 @@
+#!/bin/sh
+patch_front()
+{
+	[ ! -f /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko 2>>/dev/null
+	sed "/i915.ko/i \[ ! -f /lib/modules/misc/gpu-sched.ko \] || /sbin/insmod /lib/modules/misc/gpu-sched.ko" /etc/init.d/init_check.sh -i
+	sed "/i915.ko/i \[ ! -f /lib/modules/misc/panfrost.ko \] || /sbin/insmod /lib/modules/misc/panfrost.ko" /etc/init.d/init_check.sh -i
+	sed "/hal_netlink.ko/i if \[ x\$(fw_printenv -n qnap_kernel) != x\"qnap\" \] && [ \$(fw_printenv -n qnap_kernel_version) -lt 521 ]; then cp -f /lib/modules/misc/hal_netlink.bak /lib/modules/misc/hal_netlink.ko ; fi" /etc/init.d/init_check.sh -i
+	#echo schedutil | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+	if [ x$(fw_printenv -n qnap_kernel) = x"qnap" ]; then /sbin/insmod /lib/modules/misc/pwm-fan.ko; sed '/^SIO_HWMON_INDEX[[:space:]]*=/c\SIO_HWMON_INDEX = 7'  -i  /etc/model.conf; fi 2>>/dev/null
+	#fix model MEMORY_SIZE_M
+	Total=$(cat /proc/meminfo |grep 'MemTotal' |awk -F : '{print $2}' |sed 's/^[ \t]*//g' | cut -d " " -f1)
+	if [ $((Total % 1024 % 1024)) -eq 0 ]; then let Total=Total/1024 ;else let Total=(Total/1024/1024+1)*1024; fi
+	sed "/MEMORY_SIZE_M/c\MEMORY_SIZE_M = $Total" -i /etc/model.conf	
+	#fix mali firmware
+	mali_csffw_file=$(dmesg | grep mali | grep DDK | awk '(NR==1){print $0}' | awk -F' ' '{print $NF}' | cut -d - -f1)
+	ln -sf /lib/firmware/mali_csffw_${mali_csffw_file}/mali_csffw.bin /lib/firmware/mali_csffw.bin
+	#fix 蓝牙和wifi适配
+	sed 's/8086:2723/14e4:449d/g' /etc/init.d/scan_wifi_ups.sh -i
+	sed 's/dev_station_index=0/dev_station_index=100/g' /etc/init.d/scan_wifi_ups.sh -i
+	sed 's/8086:2723/14e4:449d/g' /etc/init.d/wait_wifi_pcie_ready.sh -i
+	sed 's/safe_load_module iwlwifi/safe_load_module dhd_static_buf/g' /etc/init.d/wireless_modules.sh -i
+	sed 's/safe_load_module iwlmvm/safe_load_module bcmdhd/g' /etc/init.d/wireless_modules.sh -i
+	sed 's/safe_load_module iwldvm/#safe_load_module iwldvm/g' /etc/init.d/wireless_modules.sh -i
+	sed 's/modules\/iwldvm.ko/modules\/bcmdhd.ko/g' /etc/init.d/wireless_modules.sh -i
+	sed 's/modules\/iwlmvm.ko/modules\/dhd_static_buf.ko/g' /etc/init.d/wireless_modules.sh -i
+	sed 's/\/sbin\/rmmod \/usr\/local\/modules\/iwlwifi.ko/#\/sbin\/rmmod \/usr\/local\/modules\/iwlwifi.ko/g' /etc/init.d/wireless_modules.sh -i
+	sed 's/"iwlwifi" "iwlmvm"/"bcmdhd" "dhd_static_buf" "iwlwifi" "iwlmvm"/g' /etc/init.d/wireless_modules.sh -i
+	sed "/boot_finished/i /usr/sbin/hciconfig hci0 up" /etc/init.d/init_check.sh -i	
+}
+
+patch_back()
+{
+	sed -i 's/^\([[:space:]]*\)if \[ -f \/tmp\/update_img.sh \]; then$/\1\/sbin\/qnap_patch -p\n&/' /etc/init.d/update.sh
+	#/sbin/insmod /lib/modules/5.10.60-qnap/uhid.ko
+	/sbin/rfkill unblock all
+	/sbin/brcm_patchram_plus -d --enable_hci --no2bytes --use_baudrate_for_download --tosleep 200000 --baudrate 1500000 --patchram /lib/firmware/ap6275p/BCM4362A2.hcd /dev/ttyS2 &	
+}
+
+while getopts ":fb" opt; do
+  case $opt in
+    f)
+	  #初始化boot前
+      patch_front
+      ;;
+    b)
+      #boot后加载
+	  patch_back
+      ;;  
+    \?)
+      echo "Invalid option: -$OPTARG" 
+      ;;
+  esac
+done
+exit 0
