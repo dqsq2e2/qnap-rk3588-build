@@ -527,7 +527,7 @@ compile_uboot() {
 
     # 配置文件定义（使用绝对路径）
     local config_files=(
-        "${UBOOT_SRC_DIR}/include/configs/evb_rk3588.h"
+        "${UBOOT_SRC_DIR}/include/configs/evb_rk3568.h"
         "${UBOOT_SRC_DIR}/cmd/qnap_boot.h"
     )
 
@@ -545,7 +545,7 @@ compile_uboot() {
     # 动态修改配置
     echo -e "${CYAN}▶ 应用板级配置修改...${NC}"
 
-    # 修改evb_rk3588.h
+    # 修改evb_rk3568.h
     sed -i -E \
         "s/^(#define CONFIG_SYS_MMC_ENV_DEV\s+)[0-9]+/\1$((target_value ? 1 : 0))/" \
         "${config_files[0]}" || {
@@ -760,7 +760,7 @@ prepare_env() {
 		echo -e "${GREEN}✓ 已创建版本目录：${dir}${NC}"
 
         # ==================== 内核配置修复 ====================
-        local kernel_cfg_src="${output_dir}/kernel_cfg/TS-X42/linux-5.10-arm64.config"
+        local kernel_cfg_src="${output_dir}/kernel_cfg/TS-X16/linux-5.10-arm64.config"
         local kernel_cfg_dest="${output_dir}/src/linux-5.10/.config"
         local kernel_src_dir="${output_dir}/src/linux-5.10"
 
@@ -1124,7 +1124,7 @@ compile_kernel() {
         }
 
         # ==================== 内核配置修复 ====================
-        local kernel_cfg_src="${kernel_root}/${kernel_dir}/kernel_cfg/TS-X42/linux-5.10-arm64.config"
+        local kernel_cfg_src="${kernel_root}/${kernel_dir}/kernel_cfg/TS-X16/linux-5.10-arm64.config"
 		local kernel_custom_cfg_src="${BOARD_DIR}/kernel-build-${version}/${BOARD_NAME}.config"
         local kernel_cfg_dest="${kernel_root}/${kernel_dir}/src/linux-5.10/.config"
 

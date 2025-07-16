@@ -1,0 +1,69 @@
+From 9d023ad1e4cf3f554c350c0c6401993149e2ee87 Mon Sep 17 00:00:00 2001
+From: R-mt <wxzmz@163.com>
+Date: Tue, 10 Jun 2025 13:52:32 +0800
+Subject: [PATCH] fix-qnap-tty
+
+---
+ drivers/tty/serial/8250/8250_core.c | 39 +----------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
+
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 576cd744a..e9d87bd2a 100755
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -926,10 +926,7 @@ static DEFINE_MUTEX(serial_mutex);
+ #if defined(CONFIG_ARCH_ALPINE) || defined(CONFIG_ARCH_MVEBU) || defined(CONFIG_ARCH_RTD129X) || defined(CONFIG_ARCH_ROCKCHIP)
+ int serial8250_write_char(int port, char val)
+ {
+-    struct uart_8250_port *up = &serial8250_ports[port];
+-
+-    serial_out(up, UART_TX, val);
+-
++    //printk("serial8250_write_char called at  port=%d, val=0x%02x\n", port, (unsigned char)val);
+     return 0;
+ }
+ EXPORT_SYMBOL(serial8250_write_char);
+@@ -940,40 +937,6 @@ EXPORT_SYMBOL(serial8250_write_char);
+ #if defined(CONFIG_ARCH_ALPINE) || defined(CONFIG_ARCH_MVEBU) || defined(CONFIG_ARCH_RTD129X) || defined(CONFIG_ARCH_ROCKCHIP)
+ void kernel_booting_buzzer(void)
+ {
+-#if defined(CONFIG_ARCH_ALPINE)
+-    struct uart_8250_port *up = &serial8250_ports[1];
+-#elif defined(CONFIG_ARCH_MVEBU)
+-    struct uart_8250_port *up = &serial8250_ports[1];
+-    unsigned int i = 0;
+-    unsigned char buzzer_cmd[4] = { '@', 'C', '2', 0x31};
+-#elif defined(CONFIG_ARCH_RTD129X)
+-    struct uart_8250_port *up = &serial8250_ports[2];
+-    unsigned int i = 0;
+-    unsigned char buzzer_cmd[4] = { '@', 'C', '2', 0x31};
+-#elif defined(CONFIG_ARCH_ROCKCHIP)
+-    struct uart_8250_port *up = &serial8250_ports[0];
+-    unsigned int i = 0;
+-    unsigned char buzzer_cmd[4] = { '@', 'C', '2', 0x31};
+-#else
+-    struct uart_8250_port *up = &serial8250_ports[1];
+-#endif
+-    struct uart_port *p = &up->port;
+-    u32 baudDivisor;
+-
+-    baudDivisor = p->uartclk / (16 * 115200);
+-    serial_port_out(p, UART_LCR, UART_LCR_DLAB);  /* set DLAB bit */
+-    serial_dl_write(up, baudDivisor);  /* set baudrate divisor */
+-    serial_port_out(p, UART_LCR, 0x3); /* clear DLAB; set 8 bits, no parity */
+-
+-#if defined(CONFIG_ARCH_ALPINE)
+-    serial_out(up, UART_TX, 0x50); /* 0x50 is mcu 0.5 sec buzzer cmd */
+-#elif defined(CONFIG_ARCH_MVEBU) || defined(CONFIG_ARCH_RTD129X) || defined(CONFIG_ARCH_ROCKCHIP)
+-    for(i=0;i<sizeof(buzzer_cmd);i++) {
+-        //printk("---- buzzer_cmd[%d] = 0x%02x\n", i, buzzer_cmd[i]);
+-        serial_out(up, UART_TX, buzzer_cmd[i]); /* 0.5 sec buzzer cmd */
+-        udelay(200);
+-    }
+-#endif
+     printk("---- kernel_booting_buzzer\n");
+     return;
+ }
+-- 
+2.34.1
+

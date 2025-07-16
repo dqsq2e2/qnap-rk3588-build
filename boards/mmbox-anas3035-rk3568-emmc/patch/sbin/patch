@@ -1,0 +1,38 @@
+#!/bin/sh
+patch_front()
+{
+	[ ! -f /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko 2>>/dev/null
+
+	Total=$(cat /proc/meminfo |grep 'MemTotal' |awk -F : '{print $2}' |sed 's/^[ \t]*//g' | cut -d " " -f1)
+	if [ $((Total % 1024 % 1024)) -eq 0 ]; then let Total=Total/1024 ;else let Total=(Total/1024/1024+1)*1024; fi
+	sed "/MEMORY_SIZE_M/c\MEMORY_SIZE_M = $Total" -i /etc/model.conf
+
+	#fix mali firmware
+	mali_csffw_file=$(dmesg | grep mali | grep DDK | awk '(NR==1){print $0}' | awk -F' ' '{print $NF}' | cut -d - -f1)
+	ln -sf /lib/firmware/mali_csffw_${mali_csffw_file}/mali_csffw.bin /lib/firmware/mali_csffw.bin
+	# rtl蓝牙补丁,usb口插入rtl8822,qnap执行lsusb 获得rtl蓝牙的bus device比如为001 003
+	# sed "/.boot_finished/i /sbin/usbreset /dev/bus/usb/001/003" /etc/init.d/init_check.sh -i	
+}
+
+patch_back()
+{
+	sed -i 's/^\([[:space:]]*\)if \[ -f \/tmp\/update_img.sh \]; then$/\1\/sbin\/qnap_patch -p\n&/' /etc/init.d/update.sh
+
+}
+
+while getopts ":fbi" opt; do
+  case $opt in
+    f)
+	  #初始化boot前
+      patch_front
+      ;;
+    b)
+      #boot后加载
+	  patch_back
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" 
+      ;;
+  esac
+done
+exit 0
