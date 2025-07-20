@@ -1,0 +1,43 @@
+From eaf2e3b643eeaa835ec51d909093c89d5349d116 Mon Sep 17 00:00:00 2001
+From: R-mt <wxzmz@163.com>
+Date: Tue, 24 Jun 2025 18:12:41 +0800
+Subject: [PATCH] fix ugreen hd4300plus pwr rk805-pwrkey driver
+
+---
+ drivers/input/misc/rk805-pwrkey.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/input/misc/rk805-pwrkey.c b/drivers/input/misc/rk805-pwrkey.c
+index 3fb64dbda..d6b9b6df0 100644
+--- a/drivers/input/misc/rk805-pwrkey.c
++++ b/drivers/input/misc/rk805-pwrkey.c
+@@ -18,20 +18,26 @@
+ static irqreturn_t pwrkey_fall_irq(int irq, void *_pwr)
+ {
+ 	struct input_dev *pwr = _pwr;
++	char *envp[] = {"ACTION=press", NULL};
+ 
+ 	input_report_key(pwr, KEY_POWER, 1);
+ 	input_sync(pwr);
+ 
++	kobject_uevent_env(&pwr->dev.kobj, KOBJ_CHANGE, envp);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+ static irqreturn_t pwrkey_rise_irq(int irq, void *_pwr)
+ {
+ 	struct input_dev *pwr = _pwr;
++	char *envp[] = {"ACTION=release", NULL};
+ 
+ 	input_report_key(pwr, KEY_POWER, 0);
+ 	input_sync(pwr);
+ 
++	kobject_uevent_env(&pwr->dev.kobj, KOBJ_CHANGE, envp);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+-- 
+2.34.1
+

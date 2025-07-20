@@ -1,4 +1,13 @@
 #!/bin/sh
+
+patch_udev()
+{
+	echo 'ACTION=="release", SUBSYSTEM=="input", ATTRS{name}=="rk805 pwrkey", ENV{ID_INPUT_KEY}=="1", RUN+="/bin/sh -c '\''/etc/init.d/power_button.sh'\''"' >> /lib/udev/rules.d/99-powerkey.rules
+	/sbin/udevadm control --reload-rules
+
+}
+
+
 patch_front()
 {
 	[ ! -f /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko 2>>/dev/null
@@ -10,7 +19,8 @@ patch_front()
 	#fix mali firmware
 	mali_csffw_file=$(dmesg | grep mali | grep DDK | awk '(NR==1){print $0}' | awk -F' ' '{print $NF}' | cut -d - -f1)
 	ln -sf /lib/firmware/mali_csffw_${mali_csffw_file}/mali_csffw.bin /lib/firmware/mali_csffw.bin
-	# rtlÀ¶ÑÀ²¹¶¡,usb¿Ú²åÈërtl8822,qnapÖ´ĞĞlsusb »ñµÃrtlÀ¶ÑÀµÄbus device±ÈÈçÎª001 003
+	sed -i '/boot_finished/i /sbin/patch -u' /etc/init.d/init_check.sh
+	# rtlè“ç‰™è¡¥ä¸,usbå£æ’å…¥rtl8822,qnapæ‰§è¡Œlsusb è·å¾—rtlè“ç‰™çš„bus deviceæ¯”å¦‚ä¸º001 003
 	# sed "/.boot_finished/i /sbin/usbreset /dev/bus/usb/001/003" /etc/init.d/init_check.sh -i	
 }
 
@@ -20,15 +30,19 @@ patch_back()
 
 }
 
-while getopts ":fbi" opt; do
+while getopts ":fubi" opt; do
   case $opt in
     f)
-	  #³õÊ¼»¯bootÇ°
+	  #åˆå§‹åŒ–bootå‰
       patch_front
       ;;
     b)
-      #bootºó¼ÓÔØ
+      #bootååŠ è½½
 	  patch_back
+      ;;
+    u)
+      #bootååŠ è½½
+	  patch_udev
       ;;
     \?)
       echo "Invalid option: -$OPTARG" 
