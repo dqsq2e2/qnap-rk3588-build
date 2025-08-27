@@ -1,0 +1,110 @@
+#!/bin/sh
+
+patch_udev()
+{
+	echo 'ACTION=="release", SUBSYSTEM=="input", ATTRS{name}=="rk805 pwrkey", ENV{ID_INPUT_KEY}=="1", RUN+="/bin/sh -c '\''/etc/init.d/power_button.sh'\''"' >> /lib/udev/rules.d/99-powerkey.rules
+	/sbin/udevadm control --reload-rules
+
+}
+
+patch_rtl_wifi_bt_adapter()
+{
+    local vid_pid=$1
+    local ko_name=$2
+    local vid=${vid_pid%:*}
+    local pid=${vid_pid#*:}
+    
+    sed "s/RTL8812BU_Vid=(2001)/RTL8812BU_Vid=($vid)/g" /etc/init.d/scan_wifi_ups.sh -i 
+    sed "s/RTL8812BU_Pid=(331c)/RTL8812BU_Pid=($pid)/g" /etc/init.d/scan_wifi_ups.sh -i
+    sed "s/RTL8812BU_vid=(2001)/RTL8812BU_vid=($vid)/g" /etc/init.d/create_udev_rule.sh -i 
+    sed "s/RTL8812BU_pid=(331c)/RTL8812BU_pid=($pid)/g" /etc/init.d/create_udev_rule.sh -i
+    sed "s/RTL8812BU_Vid=(2001)/RTL8812BU_Vid=($vid)/g" /etc/init.d/usb_device_check.sh -i 
+    sed "s/RTL8812BU_Pid=(331c)/RTL8812BU_Pid=($pid)/g" /etc/init.d/usb_device_check.sh -i
+    sed "s/8812bu/${ko_name}/g" /etc/init.d/wireless_modules.sh -i 
+    
+    # 处理ko模块
+    if [ -n "$ko_name" ]; then
+        sed "/rt2870.bin/i \            \[ -f /usr/local/modules/wifi/${ko_name}.ko \] || /bin/ln -sf /usr/local/modules/${ko_name}.ko /usr/local/modules/wifi/${ko_name}.ko" /etc/init.d/installtgz.sh -i
+    fi
+}
+
+
+selected_wifi_bt_adapter()
+{
+	# #fix 蓝牙和wifi适配
+    REALTEK_VIDS=("0bda" "0bda")  # 可以继续添加更多VID
+    REALTEK_PIDS=("c820" "d723")   # 对应的PID
+    REPLACE_KOS=("8821cu" "8723du") # 对应的驱动模块名
+    
+    realtek_device=""
+    for dev in /sys/bus/usb/devices/*; do
+        [ -f "$dev/idVendor" ] && [ -f "$dev/idProduct" ] || continue
+        
+        # 检查所有设备类型
+        for i in "${!REALTEK_VIDS[@]}"; do
+            if grep -q "${REALTEK_VIDS[$i]}" "$dev/idVendor" && \
+               grep -q "${REALTEK_PIDS[$i]}" "$dev/idProduct"; then
+                realtek_device="$(cat $dev/idVendor):$(cat $dev/idProduct)"
+                REPLACE_KO="${REPLACE_KOS[$i]}"
+                break 2  # 跳出两层循环
+            fi
+        done
+    done
+    
+    if [ -n "$realtek_device" ]; then
+
+        patch_rtl_wifi_bt_adapter "$realtek_device" "$REPLACE_KO"
+		
+        
+        # 获取设备路径用于usbreset
+        # busnum=$(cat $dev/busnum)
+        # devnum=$(cat $dev/devnum)
+        # 更新usbreset命令
+		# /sbin/usbreset /dev/bus/usb/$busnum/$devnum
+    fi
+}
+
+
+patch_front()
+{
+	[ ! -f /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko 2>>/dev/null
+
+	Total=$(cat /proc/meminfo |grep 'MemTotal' |awk -F : '{print $2}' |sed 's/^[ \t]*//g' | cut -d " " -f1)
+	if [ $((Total % 1024 % 1024)) -eq 0 ]; then let Total=Total/1024 ;else let Total=(Total/1024/1024+1)*1024; fi
+	sed "/MEMORY_SIZE_M/c\MEMORY_SIZE_M = $Total" -i /etc/model.conf
+
+	#fix mali firmware
+	mali_csffw_file=$(dmesg | grep mali | grep DDK | awk '(NR==1){print $0}' | awk -F' ' '{print $NF}' | cut -d - -f1)
+	ln -sf /lib/firmware/mali_csffw_${mali_csffw_file}/mali_csffw.bin /lib/firmware/mali_csffw.bin
+	sed -i '/boot_finished/i /sbin/patch -u' /etc/init.d/init_check.sh
+	# rtl蓝牙补丁,usb口插入rtl8822,qnap执行lsusb 获得rtl蓝牙的bus device比如为001 003
+	# sed "/.boot_finished/i /sbin/usbreset /dev/bus/usb/002/002" /etc/init.d/init_check.sh -i	
+}
+
+patch_back()
+{
+	sed -i 's/^\([[:space:]]*\)if \[ -f \/tmp\/update_img.sh \]; then$/\1\/sbin\/qnap_patch -p\n&/' /etc/init.d/update.sh
+	selected_wifi_bt_adapter
+
+}
+
+while getopts ":fubi" opt; do
+  case $opt in
+    f)
+	  #初始化boot前
+      patch_front
+      ;;
+    b)
+      #boot后加载
+	  patch_back
+      ;;
+    u)
+      #boot后加载
+	  patch_udev
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" 
+      ;;
+  esac
+done
+exit 0
