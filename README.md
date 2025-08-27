@@ -4,7 +4,7 @@
 
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 
-本项目用于探讨 RK3588/RK3588S 自动化构建 QNAP TS-AI642 固件镜像。
+本项目用于探讨 RK3568/RK3566 自动化构建 QNAP TS-416 固件镜像。
 
 本工具仅供学习交流, 严禁用于商业用途, 请于24小时之内删除。
 
@@ -20,10 +20,9 @@
 ### 当前配置板型
 | 设备型号          | 处理器       | 存储类型 | 状态       |
 |-------------------|--------------|----------|------------|
-| `rock-5c-rk3588s` | Rockchip RK3588S | eMMC/SD | ✅ 完全支持 |
-| `orangepi_5_plus` | Rockchip RK3588 | eMMC/SD  | ✅ 完全支持 |
-| `roc-rk3588s-pc` | Rockchip RK3588 | eMMC  | ✅ 完全支持 |
-| `firefly-itx-3588j` | Rockchip RK3588 | eMMC  | ✅ 完全支持 |
+| `mmbox-anas3035` | Rockchip RK3588S | eMMC/SD | ✅ 完全支持 |
+| `dg-nas-lite-rk3568` | Rockchip RK3588 | eMMC/SD  | ✅ 完全支持 |
+
 
 > 提示：可通过修改 `qnap_build.conf` 扩展新设备支持
 
@@ -68,14 +67,14 @@
 
 ### 2. 指定设备构建
 ```bash
-./create_dom.sh board=orangepi_5_plus-emmc
+./create_dom.sh board=mmbox-anas3035-rk3568-emmc
 ```
 
 ### 3. 强制dtb重新编译构建
 ```bash
 ./create_dom.sh dtb=force
 ```
-- 默认值dtb=auto, boards/dts-files/默认配置rock-5c-rk3588s-emmc.dts修改后, 再次./create_dom.sh的时候, 如果boards/[板型名称]/build-out目录已经存在对应的dtb文件,不会重新编译dtb。
+- 默认值dtb=auto, boards/dts-files/默认配置rk3568-mmbox-anas3035-emmc.dts修改后, 再次./create_dom.sh的时候, 如果boards/[板型名称]/build-out目录已经存在对应的dtb文件,不会重新编译dtb。
 - dtb=force时, boards/[板型名称]/build-out目录无论已经存在对应的dtb文件, 均重新编译dtb,最后打包整个固件。
 - ./create_dom.sh kernel=force
 - ./create_dom.sh uboot=force
@@ -88,19 +87,19 @@
 ### 一级配置文件 (`boards/qnap_build.conf`)
 ```conf
 # 设备基础配置
-BOARD_NAME="rock-5c-rk3588s-emmc"
-#对应boards/rock-5c-rk3588s-emmc目录
+BOARD_NAME="rk3568-mmbox-anas3035-emmc"
+#对应boards/rk3568-mmbox-anas3035-emmc目录
 KERNEL_BOOT_MODE="custom"
 #对应uboot引导时 挂载qnap原厂内核还是自编译内核, 如果设定为qnap,引导qnap原厂内核, 也可以系统启动后 fw_printenv qnap_kernel查询后修改 fw_setenv qnap_kernel qnap
-QNAP_FIRMWARE_FILE="TS-X42_20250108-5.2.3.3006.zip"
+QNAP_FIRMWARE_FILE="TS-X16_20250108-5.2.3.3006.zip"
 #dom包中放入的初始固件版本,自行去qnap官方网站对应的下载链接
 ```
 ### 二级配置文件 (`boards/机型/custom.conf`)
 ```conf
-UBOOT_CONFIG="rock-5c-rk3588s"
-#对应u-boot/u-boot-qnap/configs/中的rock-5c-rk3588s_defconfig文件
-DTS_FILES="rk3588s-rock-5c"
-#对应boards/dts-files/中rk3588s-rock-5c.dts
+UBOOT_CONFIG="mmbox-anas3035-rk3568"
+#对应u-boot/u-boot-qnap/configs/中的mmbox-anas3035-rk3568_defconfig文件
+DTS_FILES="rk3568-mmbox-anas3035-emmc"
+#对应boards/dts-files/中rk3568-mmbox-anas3035-emmc.dts
 ```
 ### 常用参数说明
 | 参数                 | 可选值              | 说明                      |
