@@ -1,0 +1,59 @@
+From 96c3f81c530dc5f8b2a0d6ad97b21db869624d91 Mon Sep 17 00:00:00 2001
+From: R-mt <wxzmz@163.com>
+Date: Fri, 22 Aug 2025 01:20:39 +0800
+Subject: [PATCH] diable rtl8211f eee
+
+---
+ .../net/ethernet/stmicro/stmmac/stmmac_main.c | 24 +++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index 0517dc8d1..d58846268 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -4934,6 +4934,23 @@ static int phy_rtl8211f_led_fixup(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
++static int phy_rtl8211f_eee_fixup(struct phy_device *phydev)
++{
++	phy_write(phydev, 31, 0x0000);
++	phy_write(phydev,  0, 0x8000);
++	mdelay(20);
++	phy_write(phydev, 31, 0x0a4b);
++	phy_write(phydev, 17, 0x1110);
++	phy_write(phydev, 31, 0x0000);
++	phy_write(phydev, 13, 0x0007);
++	phy_write(phydev, 14, 0x003c);
++	phy_write(phydev, 13, 0x4007);
++	phy_write(phydev, 14, 0x0000);
++
++	return 0;
++}
++
++
+ 
+ /**
+  * stmmac_dvr_probe
+@@ -5178,11 +5195,18 @@ int stmmac_dvr_probe(struct device *device,
+     priv->release_flags = 0;
+ #endif
+ 
++	/* Register fixup led for PHY RTL8211F */
+ 	ret = phy_register_fixup_for_uid(RTL8211F_PHY_ID, RTL8211F_PHY_ID_MASK, phy_rtl8211f_led_fixup);
+ 	if (ret) {
+ 		dev_warn(priv->device, "Failed to register fixup for PHY RTL8211F.\n");
+ 	}
+ 
++	/* Register fixup for PHY RTL8211F disabling EEE */
++	ret = phy_register_fixup_for_uid(RTL8211F_PHY_ID, RTL8211F_PHY_ID_MASK, phy_rtl8211f_eee_fixup);
++	if (ret) {
++		dev_warn(priv->device, "Failed to register fixup for PHY RTL8211F disabling EEE.\n");
++	}
++
+ 
+ 	return ret;
+ 
+-- 
+2.34.1
+
