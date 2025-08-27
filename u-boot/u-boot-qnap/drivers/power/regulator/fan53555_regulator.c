@@ -445,7 +445,7 @@ static void fan53555_rk860_calibration(struct udevice *dev, struct fan53555_regu
 	if (ret < 0) {
 		printf("%s>>>>>>hardware do not have rk860-0\n", __func__);
 	} else {
-		if (value == 0x00 || value == 0x04) {
+		if (value == 0x00 || value == 0x04 || value == 0x01) {  // 增加对0x01的支持
 			di->rk860_type = IS_RK860_0_ONLY;
 			version0 = value & 0x04;
 			printf("%s>>>>>>hardware have rk860-0, reg[0x0e] = 0x%x\n", __func__, value);
