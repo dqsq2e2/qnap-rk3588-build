@@ -871,6 +871,7 @@
 &mdio0 {
 	rgmii_phy0: phy@1 {
 		compatible = "ethernet-phy-ieee802.3-c22";
+		eee-broken-1000t;
 		reg = <0x1>;
 	};
 };
