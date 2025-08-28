@@ -31,22 +31,23 @@
 
 //	/delete-node/ chosen;	
 	aliases {
+		ethernet0 = &gmac1;
 		mmc0 = &sdhci;
 		mmc1 = &sdmmc;
 	};	
 	
-        fiq_debugger: fiq-debugger {
-                compatible = "rockchip,fiq-debugger";
-                rockchip,serial-id = <2>;
-                rockchip,wake-irq = <0>;
-                /* If enable uart uses irq instead of fiq */
-                rockchip,irq-mode-enable = <1>;
-                rockchip,baudrate = <115200>;  /* Only 115200 and 1500000 */
-                interrupts = <GIC_SPI 423 IRQ_TYPE_LEVEL_LOW>;
-                pinctrl-names = "default";
-                pinctrl-0 = <&uart2m0_xfer>;
-                status = "okay";
-        };	
+	fiq_debugger: fiq-debugger {
+		compatible = "rockchip,fiq-debugger";
+		rockchip,serial-id = <2>;
+		rockchip,wake-irq = <0>;
+		/* If enable uart uses irq instead of fiq */
+		rockchip,irq-mode-enable = <1>;
+		rockchip,baudrate = <115200>;  /* Only 115200 and 1500000 */
+		interrupts = <GIC_SPI 423 IRQ_TYPE_LEVEL_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&uart2m0_xfer>;
+		status = "okay";
+	};
 
 	fan0: pwm-fan {
 		compatible = "pwm-fan";
@@ -627,6 +628,7 @@
 &mdio1 {
 	rgmii_phy1: phy@1 {
 		compatible = "ethernet-phy-ieee802.3-c22";
+		eee-broken-1000t;
 		reg = <0x1>;
 	};
 };
