@@ -1,0 +1,1096 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * BDY G98 (RK3588) for QNAP TS-AI642 QTS build.
+ *
+ * 硬件事实来源（优先级从高到低）：
+ *  1. rockchip develop-6.6 已验证适配 rk3588-bdy-g98.dts
+ *     （BDY_G98_RK3588/rockchip-linux_develop-6.6/0001-adapt-...patch，fnOS 在跑）
+ *  2. 原厂 SPI 备份反编译 dtb（rk3588-nvr-demo-v10-spi-nor 派生，很多外设没开）
+ *
+ * G98 硬件配置（与原厂 dts 核对）：
+ *  - 2x M.2 NVMe：pcie3x4(fe150000) + pcie3x2(fe160000)，共享 pcie30phy，
+ *    必须 PHY_MODE_PCIE_NANBNB（x2+x2 拆分），vcc3v3_nvme 统一供电 gpio3_PD5
+ *  - 1x SATA：sata0(fe210000)，combphy0_ps，pm-reset gpio0_PD5
+ *  - 2x 2.5G 网口：RTL8125 挂在 pcie2x1l0(fe170000)/pcie2x1l1(fe180000)
+ *  - 8x 千兆网口：两颗 YT9215 交换机（各 4 口），RGMII 挂 gmac0/gmac1，
+ *    DSA 驱动（mmyangfl 主线版回移 5.10，见 patch 0032/0033）
+ *  - 2x USB3.0：usbdrd3_0(fc000000) + usbdrd3_1(fc400000)，均 host
+ *  - 1x HDMI：hdmi0（DDC 硬件通路坏，用 i2c-gpio bitbang，6.6 dts 验证）
+ *  - RTC hym8563 @ i2c6；PMIC rk806 @ spi2；CPU 大核 rk8602/rk8603 @ i2c0；
+ *    NPU 电源 rk8602 @ i2c2；音频 es8311 @ i2c3（原厂开启，保留）
+ *  - 无 PWM 风扇（原厂与 6.6 dts 均无 fan 节点）、无 SD 卡槽、无 wifi
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/pinctrl/rockchip.h>
+#include <dt-bindings/display/rockchip_vop.h>
+#include "rk3588.dtsi"
+#include "rk3588-rk806-single.dtsi"
+
+/ {
+	model = "QNAP TS-AI642";
+	compatible = "rockchip,rk3588-nvr-demo-v10", "rockchip,rk3588";
+
+	aliases {
+		mmc0 = &sdhci;
+		mmc1 = &sdmmc;
+	};
+
+	fiq_debugger: fiq-debugger {
+		compatible = "rockchip,fiq-debugger";
+		rockchip,serial-id = <2>;
+		rockchip,wake-irq = <0>;
+		/* If enable uart uses irq instead of fiq */
+		rockchip,irq-mode-enable = <1>;
+		rockchip,baudrate = <115200>;  /* Only 115200 and 1500000 */
+		interrupts = <GIC_SPI 423 IRQ_TYPE_LEVEL_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&uart2m0_xfer>;
+		status = "okay";
+	};
+
+	/*
+	 * HDMI DDC over bitbanged GPIO. The dw-hdmi hardware DDC path on the
+	 * hdmim0_tx0 pins only produces "i2c read err!" on this board; drive
+	 * the same physical pins (GPIO4_B7=SCL, GPIO4_C0=SDA) with i2c-gpio.
+	 * （6.6 dts 验证过的 G98 硬件缺陷 workaround）
+	 */
+	i2c_gpio_ddc: i2c-gpio-ddc {
+		compatible = "i2c-gpio";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		scl-gpios = <&gpio4 RK_PB7 GPIO_ACTIVE_HIGH>;
+		sda-gpios = <&gpio4 RK_PC0 GPIO_ACTIVE_HIGH>;
+		i2c-gpio,delay-us = <5>;
+		status = "okay";
+	};
+
+	/* System SRAM1 (1MB); first 512KB reserved for the rknpu driver. */
+	sram@fd600000 {
+		compatible = "mmio-sram";
+		reg = <0x0 0xfd600000 0x0 0x100000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x0 0xfd600000 0x100000>;
+
+		rknpu_sram: rknpu-sram@0 {
+			reg = <0x0 0x80000>;
+		};
+	};
+
+	adc-keys {
+		compatible = "adc-keys";
+		io-channel-names = "buttons";
+		io-channels = <&saradc 1>;
+		keyup-threshold-microvolt = <1800000>;
+		poll-interval = <100>;
+		status = "okay";
+
+		recovery-key {
+			label = "F12";
+			linux,code = <KEY_F12>;
+			press-threshold-microvolt = <1750>;
+		};
+	};
+
+	vcc12v_dcin: vcc12v-dcin {
+		compatible = "regulator-fixed";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <12000000>;
+		regulator-max-microvolt = <12000000>;
+		regulator-name = "vcc12v_dcin";
+	};
+
+	vcc5v0_sys: vcc5v0-sys {
+		compatible = "regulator-fixed";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-name = "vcc5v0_sys";
+		vin-supply = <&vcc12v_dcin>;
+	};
+
+	vcc_1v1_nldo_s3: vcc-1v1-nldo-s3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_1v1_nldo_s3";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <1100000>;
+		regulator-max-microvolt = <1100000>;
+		vin-supply = <&vcc5v0_sys>;
+	};
+
+	/* 两个 M.2 槽 + 两个 RTL8125 共用的 3.3V 供电（原厂名 vcc3v3_pcie30） */
+	vcc3v3_nvme: vcc3v3-nvme {
+		compatible = "regulator-fixed";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-name = "vcc3v3_nvme";
+		vin-supply = <&vcc12v_dcin>;
+		enable-active-high;
+		gpios = <&gpio3 RK_PD5 GPIO_ACTIVE_HIGH>;
+		startup-delay-us = <7500>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&nvme_power_en>;
+	};
+
+	/*
+	 * NOTE: 原厂/6.6 dts 均为单数 "gpio" 属性（fixed-regulator 实际解析
+	 * "gpios"/"enable-gpios"），保持与已验证 dts 一致——该引脚仅由
+	 * pinctrl 复用为 GPIO，VBUS 开关在本板为上浮有效。
+	 */
+	vcc5v0_host: vcc5v0-host-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio4 RK_PB0 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc5v0_host_en>;
+		regulator-name = "vcc5v0_host";
+		regulator-boot-on;
+		regulator-always-on;
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		vin-supply = <&vcc5v0_sys>;
+	};
+
+	vcc5v0_otg: vcc5v0-otg-regulator {
+		compatible = "regulator-fixed";
+		enable-active-high;
+		gpio = <&gpio4 RK_PA7 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc5v0_otg_en>;
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+		regulator-name = "vcc5v0_otg";
+		vin-supply = <&vcc5v0_sys>;
+	};
+
+	leds: gpio-leds {
+		compatible = "gpio-leds";
+		status = "okay";
+
+		hdd-led {
+			default-state = "off";
+			gpios = <&gpio3 RK_PC1 GPIO_ACTIVE_HIGH>;
+		};
+
+		net-led {
+			default-state = "off";
+			gpios = <&gpio3 RK_PC0 GPIO_ACTIVE_HIGH>;
+		};
+
+		work-led {
+			gpios = <&gpio3 RK_PB7 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+		};
+	};
+
+	/* HDMI audio: i2s5_8ch -> hdmi0 (BSP "rockchip,hdmi" machine) */
+	hdmi0_sound: hdmi0-sound {
+		compatible = "rockchip,hdmi";
+		rockchip,mclk-fs = <128>;
+		rockchip,card-name = "rockchip-hdmi0";
+		rockchip,cpu = <&i2s5_8ch>;
+		rockchip,codec = <&hdmi0>;
+		rockchip,jack-det;
+		status = "okay";
+	};
+
+	/* es8311 音频（原厂 dts 开启，i2c3 + i2s0） */
+	i2s0_sound: i2s0-sound {
+		status = "okay";
+		compatible = "simple-audio-card";
+		simple-audio-card,format = "i2s";
+		simple-audio-card,mclk-fs = <256>;
+		simple-audio-card,name = "rockchip,es8311";
+		simple-audio-card,dai-link@0 {
+			format = "i2s";
+			cpu {
+				sound-dai = <&i2s0_8ch>;
+			};
+			codec {
+				sound-dai = <&es8311>;
+			};
+		};
+	};
+};
+
+/* ===== CPU 供电 ===== */
+
+&cpu_l0 {
+	cpu-supply = <&vdd_cpu_lit_s0>;
+	mem-supply = <&vdd_cpu_lit_s0>;
+};
+
+&cpu_l1 {
+	cpu-supply = <&vdd_cpu_lit_s0>;
+	mem-supply = <&vdd_cpu_lit_s0>;
+};
+
+&cpu_l2 {
+	cpu-supply = <&vdd_cpu_lit_s0>;
+	mem-supply = <&vdd_cpu_lit_s0>;
+};
+
+&cpu_l3 {
+	cpu-supply = <&vdd_cpu_lit_s0>;
+	mem-supply = <&vdd_cpu_lit_s0>;
+};
+
+&cpu_b0 {
+	cpu-supply = <&vdd_cpu_big0_s0>;
+	mem-supply = <&vdd_cpu_big0_s0>;
+};
+
+&cpu_b1 {
+	cpu-supply = <&vdd_cpu_big0_s0>;
+	mem-supply = <&vdd_cpu_big0_s0>;
+};
+
+&cpu_b2 {
+	cpu-supply = <&vdd_cpu_big1_s0>;
+	mem-supply = <&vdd_cpu_big1_s0>;
+};
+
+&cpu_b3 {
+	cpu-supply = <&vdd_cpu_big1_s0>;
+	mem-supply = <&vdd_cpu_big1_s0>;
+};
+
+&i2c0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c0m2_xfer>;
+	status = "okay";
+
+	vdd_cpu_big0_s0: vdd_cpu_big0_mem_s0: rk8602@42 {
+		compatible = "rockchip,rk8602";
+		reg = <0x42>;
+		rockchip,suspend-voltage-selector = <1>;
+		regulator-compatible = "rk860x-reg";
+		regulator-name = "vdd_cpu_big0_s0";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <550000>;
+		regulator-max-microvolt = <1050000>;
+		regulator-ramp-delay = <2300>;
+		vin-supply = <&vcc5v0_sys>;
+
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
+	};
+
+	vdd_cpu_big1_s0: vdd_cpu_big1_mem_s0: rk8603@43 {
+		compatible = "rockchip,rk8603";
+		reg = <0x43>;
+		rockchip,suspend-voltage-selector = <1>;
+		regulator-compatible = "rk860x-reg";
+		regulator-name = "vdd_cpu_big1_s0";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <550000>;
+		regulator-max-microvolt = <1050000>;
+		regulator-ramp-delay = <2300>;
+		vin-supply = <&vcc5v0_sys>;
+
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
+	};
+};
+
+/* ===== PMIC (rk806, spi2) ===== */
+
+&rk806single {
+	pinctrl-names = "default", "pmic-power-off", "pmic-reset", "pmic-sleep";
+	pinctrl-0 = <&pmic_pins &rk806_dvs1_null &rk806_dvs2_null &rk806_dvs3_null>;
+	pinctrl-1 = <&rk806_dvs1_pwrdn>;
+	pinctrl-2 = <&rk806_dvs1_rst>;
+	pinctrl-3 = <&rk806_dvs1_slp>;
+	system-power-controller;
+};
+
+&rk806_dvs1_null {
+	pins = "gpio_pwrctrl1";
+};
+
+/* ===== 休眠/关机 ===== */
+
+&rockchip_suspend {
+	rockchip,virtual-poweroff = <1>;
+	status = "okay";
+};
+
+/* ===== I2C / RTC ===== */
+
+&i2c1 {
+	status = "disabled";
+};
+
+&i2c2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2m0_xfer>;
+	status = "okay";
+
+	/* NPU core/mem 电源轨在本板挂在同一片 rk8602 上 */
+	vdd_npu_s0: vdd_npu_mem_s0: rk8602@42 {
+		compatible = "rockchip,rk8602";
+		reg = <0x42>;
+		rockchip,suspend-voltage-selector = <1>;
+		regulator-compatible = "rk860x-reg";
+		regulator-name = "vdd_npu_s0";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-enable-ramp-delay = <500>;
+		regulator-min-microvolt = <550000>;
+		regulator-max-microvolt = <950000>;
+		regulator-ramp-delay = <2300>;
+		vin-supply = <&vcc5v0_sys>;
+
+		regulator-state-mem {
+			regulator-off-in-suspend;
+		};
+	};
+};
+
+&i2c3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c3m0_xfer>;
+	status = "okay";
+
+	es8311: es8311@18 {
+		status = "okay";
+		compatible = "everest,es8311";
+		reg = <0x18>;
+		#sound-dai-cells = <0>;
+		clocks = <&cru I2S0_8CH_MCLKOUT>;
+		clock-names = "mclk";
+		assigned-clocks = <&cru I2S0_8CH_MCLKOUT>;
+		assigned-clock-rates = <12288000>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&i2s0_mclk>;
+	};
+};
+
+&i2c4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c4m3_xfer>;
+	status = "okay";
+};
+
+&i2c5 {
+	status = "okay";
+};
+
+&i2c6 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c6m0_xfer>;
+	status = "okay";
+
+	hym8563: hym8563@51 {
+		compatible = "haoyu,hym8563";
+		reg = <0x51>;
+		#clock-cells = <0>;
+		clock-output-names = "hym8563";
+		pinctrl-names = "default";
+		pinctrl-0 = <&hym8563_int>;
+		interrupt-parent = <&gpio0>;
+		interrupts = <RK_PB2 IRQ_TYPE_LEVEL_LOW>;
+		wakeup-source;
+	};
+};
+
+&i2s0_8ch {
+	status = "okay";
+};
+
+/* ===== PCIe PHY ===== */
+
+&combphy0_ps {
+	pinctrl-0 = <&sata0_pm_reset>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&combphy1_ps {
+	status = "okay";
+};
+
+&combphy2_psu {
+	status = "okay";
+};
+
+/*
+ * 双 M.2 关键配置：pcie30phy 必须 NANBNB（x2+x2 拆分），
+ * 对应主线 data-lanes = <1 1 2 2>；缺了它 pcie3x2(第二槽) 永远没有 lane。
+ */
+&pcie30phy {
+	rockchip,pcie30-phymode = <PHY_MODE_PCIE_NANBNB>;
+	status = "okay";
+};
+
+/* ===== PCIe 控制器 ===== */
+
+// pcie2x1l0: pcie@fe170000 -> RTL8125 (0002:21:00.0) 2.5G 网口 1
+&pcie2x1l0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie2_0_rst>;
+	supports-clkreq;
+	reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
+	vpcie3v3-supply = <&vcc3v3_nvme>;
+	status = "okay";
+
+	/*
+	 * 部分出厂 RTL8125 配置 EEPROM 为空，默认 LEDSEL 在 2.5G 下
+	 * RJ45 LED 不亮；四组 LED 全部设为任意速率亮/活动闪烁。
+	 * 节点层级必须镜像 PCI 拓扑（root port -> endpoint），
+	 * 属性由支持 r8125,ledN 的驱动解析；不支持的驱动会安全忽略。
+	 */
+	pcie@0,0 {
+		reg = <0x0000 0 0 0 0>;
+		#address-cells = <3>;
+		#size-cells = <2>;
+		ranges;
+
+		ethernet@0,0 {
+			reg = <0x0000 0 0 0 0>;
+			r8125,led0 = <0x22b>;
+			r8125,led1 = <0x22b>;
+			r8125,led2 = <0x22b>;
+			r8125,led3 = <0x22b>;
+		};
+	};
+};
+
+// pcie2x1l1: pcie@fe180000 -> RTL8125 (0003:31:00.0) 2.5G 网口 2
+&pcie2x1l1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie2_1_rst>;
+	supports-clkreq;
+	reset-gpios = <&gpio4 RK_PA2 GPIO_ACTIVE_HIGH>;
+	vpcie3v3-supply = <&vcc3v3_nvme>;
+	status = "okay";
+
+	pcie@0,0 {
+		reg = <0x0000 0 0 0 0>;
+		#address-cells = <3>;
+		#size-cells = <2>;
+		ranges;
+
+		ethernet@0,0 {
+			reg = <0x0000 0 0 0 0>;
+			r8125,led0 = <0x22b>;
+			r8125,led1 = <0x22b>;
+			r8125,led2 = <0x22b>;
+			r8125,led3 = <0x22b>;
+		};
+	};
+};
+
+// pcie2x1l2: pcie@fe190000 未使用
+&pcie2x1l2 {
+	status = "disabled";
+};
+
+// pcie3x2: pcie@fe160000 -> M.2 槽 2（近 SATA）
+&pcie3x2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie3x2_rst>;
+	num-lanes = <2>;
+	reset-gpios = <&gpio3 RK_PD4 GPIO_ACTIVE_HIGH>;
+	vpcie3v3-supply = <&vcc3v3_nvme>;
+	status = "okay";
+};
+
+// pcie3x4: pcie@fe150000 -> M.2 槽 1（近 CPU，x2 电气）
+&pcie3x4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie3x4_rst>;
+	num-lanes = <2>;
+	reset-gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
+	vpcie3v3-supply = <&vcc3v3_nvme>;
+	status = "okay";
+};
+
+/* ===== 引脚 ===== */
+
+&pinctrl {
+	hym8563 {
+		hym8563_int: hym8563-int {
+			rockchip,pins = <0 RK_PB2 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+	};
+
+	pcie {
+		pcie2_0_rst: pcie2-0-rst {
+			rockchip,pins = <4 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		pcie2_1_rst: pcie2-1-rst {
+			rockchip,pins = <4 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		pcie3x2_rst: pcie3x2-rst {
+			rockchip,pins = <3 RK_PD4 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		pcie3x4_rst: pcie3x4-rst {
+			rockchip,pins = <4 RK_PB6 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	nvme {
+		nvme_power_en: nvme-power-en {
+			rockchip,pins = <3 RK_PD5 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	usb {
+		vcc5v0_host_en: vcc5v0-host-en {
+			rockchip,pins = <4 RK_PB0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		vcc5v0_otg_en: vcc5v0-otg-en {
+			rockchip,pins = <4 RK_PA7 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	sata {
+		sata0_pm_reset: sata0-pm-reset {
+			rockchip,pins = <0 RK_PD5 RK_FUNC_GPIO &pcfg_output_high>;
+		};
+	};
+};
+
+/* ===== 存储 ===== */
+
+&sdhci {
+	bus-width = <8>;
+	no-sdio;
+	no-sd;
+	supports-emmc;
+	non-removable;
+	mmc-hs200-1_8v;
+	mmc-hs400-1_8v;
+	mmc-hs400-enhanced-strobe;
+	status = "okay";
+};
+
+/* G98 无 SD 卡槽、无 SDIO wifi */
+&sdmmc {
+	status = "disabled";
+};
+
+&sdio {
+	/delete-property/ pinctrl-0;
+	/delete-property/ pinctrl-names;
+	status = "disabled";
+};
+
+/* G98 仅 1 个 SATA 口 */
+&sata0 {
+	status = "okay";
+};
+
+&sata1 {
+	status = "disabled";
+};
+
+&sata2 {
+	status = "disabled";
+};
+
+/* ===== 网口（2x YT9215 交换机，DSA 驱动） =====
+ *
+ * gmac0/gmac1 各通过 RGMII 接一颗 YT9215（各出 4 个千兆口），DSA 驱动
+ * （kernel-patchs-523/0032+0033，主线 mmyangfl 版回移 5.10）：
+ * 每颗交换机的用户口 port@1-4 出 lan，port@9 为 CPU 口（fixed-link 挂在
+ * 交换机节点上，gmac 侧不带 fixed-link）；内部 PHY 经驱动 phy_read/
+ * phy_write 注册到 DSA slave mii bus，用户口不写 phy-handle。
+ * 两颗交换机无 DSA 互联链路，各成一棵树（dsa,member=<0 0>/<1 0>，
+ * 5.10 支持该属性；缺省则两颗都进 tree 0，CPU 口会配错）。
+ * lan 编号：mdio1/gmac1 侧 lan1-4，mdio0/gmac0 侧 lan5-8。
+ */
+
+&gmac0 {
+	clock_in_out = "output";
+	phy-mode = "rgmii-rxid";
+	tx_delay = <0x44>;
+	pinctrl-0 = <&gmac0_miim &gmac0_tx_bus2 &gmac0_rx_bus2 &gmac0_rgmii_clk &gmac0_rgmii_bus>;
+	pinctrl-names = "default";
+	snps,reset-active-low;
+	snps,reset-delays-us = <0x00 0x4e20 0x186a0>;
+	snps,reset-gpio = <&gpio3 RK_PD0 GPIO_ACTIVE_LOW>;
+	status = "okay";
+};
+
+&gmac1 {
+	clock_in_out = "output";
+	phy-mode = "rgmii-rxid";
+	tx_delay = <0x42>;
+	pinctrl-0 = <&gmac1_miim &gmac1_tx_bus2 &gmac1_rx_bus2 &gmac1_rgmii_clk &gmac1_rgmii_bus>;
+	pinctrl-names = "default";
+	snps,reset-active-low;
+	snps,reset-delays-us = <0x00 0x4e20 0x186a0>;
+	snps,reset-gpio = <&gpio4 RK_PB3 GPIO_ACTIVE_LOW>;
+	status = "okay";
+};
+
+&mdio0 {
+	ytgsw1: switch@1d {
+		compatible = "motorcomm,yt9215";
+		reg = <0x1d>;
+		dsa,member = <1 0>;
+
+		ethernet-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			ethernet-port@1 {
+				reg = <1>;
+				label = "lan5";
+				phy-mode = "internal";
+			};
+			ethernet-port@2 {
+				reg = <2>;
+				label = "lan6";
+				phy-mode = "internal";
+			};
+			ethernet-port@3 {
+				reg = <3>;
+				label = "lan7";
+				phy-mode = "internal";
+			};
+			ethernet-port@4 {
+				reg = <4>;
+				label = "lan8";
+				phy-mode = "internal";
+			};
+			ethernet-port@9 {
+				reg = <9>;
+				label = "cpu";
+				ethernet = <&gmac0>;
+				phy-mode = "rgmii-txid";
+
+				fixed-link {
+					speed = <1000>;
+					full-duplex;
+					pause;
+				};
+			};
+		};
+	};
+};
+
+&mdio1 {
+	ytgsw0: switch@1d {
+		compatible = "motorcomm,yt9215";
+		reg = <0x1d>;
+		dsa,member = <0 0>;
+
+		ethernet-ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			ethernet-port@1 {
+				reg = <1>;
+				label = "lan1";
+				phy-mode = "internal";
+			};
+			ethernet-port@2 {
+				reg = <2>;
+				label = "lan2";
+				phy-mode = "internal";
+			};
+			ethernet-port@3 {
+				reg = <3>;
+				label = "lan3";
+				phy-mode = "internal";
+			};
+			ethernet-port@4 {
+				reg = <4>;
+				label = "lan4";
+				phy-mode = "internal";
+			};
+			ethernet-port@9 {
+				reg = <9>;
+				label = "cpu";
+				ethernet = <&gmac1>;
+				phy-mode = "rgmii-txid";
+
+				fixed-link {
+					speed = <1000>;
+					full-duplex;
+					pause;
+				};
+			};
+		};
+	};
+};
+
+/* ===== UART ===== */
+
+/*
+ * 串口控制台由 fiq-debugger(ttyFIQ0) 占用 uart2。
+ * uart7 本板未使用，保持 disabled。
+ * （注：早期 6.6 dts 注释称 uart7m2 与 pcie2x1l0 PERST# 冲突，那是
+ *  PERST# 被误记为 GPIO1_PB4 时的结论；实际 PERST# 是 GPIO4_PB4，
+ *  与 uart7m2 的 GPIO1_PB4/PB5 并无冲突。）
+ */
+&uart7 {
+	status = "disabled";
+};
+
+/* ===== USB ===== */
+
+&u2phy0 {
+	status = "okay";
+};
+
+&u2phy0_otg {
+	phy-supply = <&vcc5v0_otg>;
+	status = "okay";
+};
+
+&u2phy1 {
+	status = "okay";
+};
+
+&u2phy1_otg {
+	phy-supply = <&vcc5v0_host>;
+	status = "okay";
+};
+
+&usbdp_phy0 {
+	rockchip,dp-lane-mux = <2 3>;
+	status = "okay";
+};
+
+&usbdp_phy0_u3 {
+	status = "okay";
+};
+
+&usbdp_phy1 {
+	rockchip,dp-lane-mux = <2 3>;
+	status = "okay";
+};
+
+&usbdp_phy1_u3 {
+	status = "okay";
+};
+
+&u2phy2 {
+	status = "okay";
+};
+
+&u2phy2_host {
+	phy-supply = <&vcc5v0_host>;
+	status = "okay";
+};
+
+&usbdrd3_0 {
+	status = "okay";
+};
+
+&usbdrd_dwc3_0 {
+	dr_mode = "host";
+	status = "okay";
+};
+
+&usb_host0_ehci {
+	status = "okay";
+};
+
+&usb_host0_ohci {
+	status = "okay";
+};
+
+&u2phy3 {
+	status = "okay";
+};
+
+&u2phy3_host {
+	phy-supply = <&vcc5v0_host>;
+	status = "okay";
+};
+
+&usbdrd3_1 {
+	status = "okay";
+};
+
+&usbdrd_dwc3_1 {
+	dr_mode = "host";
+	status = "okay";
+};
+
+&usb_host1_ehci {
+	status = "okay";
+};
+
+&usb_host1_ohci {
+	status = "okay";
+};
+
+&usbhost3_0 {
+	status = "okay";
+};
+
+&usbhost_dwc3_0 {
+	status = "okay";
+};
+
+/* ===== HDMI（G98 仅 hdmi0） ===== */
+
+&hdptxphy_hdmi0 {
+	status = "okay";
+};
+
+&hdmi0 {
+	enable-gpios = <&gpio4 RK_PB1 GPIO_ACTIVE_HIGH>;
+
+	ddc-i2c-bus = <&i2c_gpio_ddc>;
+	pinctrl-0 = <&hdmim0_tx0_cec &hdmim0_tx0_hpd>;
+	status = "okay";
+};
+
+&hdmi0_in_vp0 {
+	status = "okay";
+};
+
+&hdmi0_in_vp1 {
+	status = "okay";
+};
+
+&hdmi0_in_vp2 {
+	status = "okay";
+};
+
+&route_hdmi0 {
+	status = "okay";
+};
+
+&i2s5_8ch {
+	status = "okay";
+};
+
+&vop_mmu {
+	status = "okay";
+};
+
+&vop {
+	/* rockchip-vop2 fails probe with -ENODEV without this */
+	vop-supply = <&vdd_log_s0>;
+	status = "okay";
+};
+
+&vp0 {
+	rockchip,plane-mask = <(1 << ROCKCHIP_VOP2_CLUSTER0 |
+				1 << ROCKCHIP_VOP2_ESMART0)>;
+	rockchip,primary-plane = <ROCKCHIP_VOP2_ESMART0>;
+};
+
+&vp1 {
+	rockchip,plane-mask = <(1 << ROCKCHIP_VOP2_CLUSTER1 |
+				1 << ROCKCHIP_VOP2_ESMART1)>;
+	rockchip,primary-plane = <ROCKCHIP_VOP2_ESMART1>;
+};
+
+&vp2 {
+	rockchip,plane-mask = <(1 << ROCKCHIP_VOP2_CLUSTER2 |
+				1 << ROCKCHIP_VOP2_ESMART2)>;
+	rockchip,primary-plane = <ROCKCHIP_VOP2_ESMART2>;
+};
+
+&vp3 {
+	rockchip,plane-mask = <(1 << ROCKCHIP_VOP2_CLUSTER3 |
+				1 << ROCKCHIP_VOP2_ESMART3)>;
+	rockchip,primary-plane = <ROCKCHIP_VOP2_ESMART3>;
+};
+
+/* ===== 其他 ===== */
+
+&saradc {
+	vref-supply = <&avcc_1v8_s0>;
+	status = "okay";
+};
+
+&tsadc {
+	/* BSP thermal driver bails out without the GRF phandle */
+	rockchip,grf = <&sys_grf>;
+	status = "okay";
+};
+
+&dfi {
+	status = "okay";
+};
+
+/* ===== NPU / GPU / VPU / RGA ===== */
+
+&rknpu {
+	reg = <0x0 0xfdab0000 0x0 0x5000>,
+	      <0x0 0xfdac0000 0x0 0x5000>,
+	      <0x0 0xfdad0000 0x0 0x5000>;
+	rockchip,sram = <&rknpu_sram>;
+	rknpu-supply = <&vdd_npu_s0>;
+	mem-supply = <&vdd_npu_mem_s0>;
+	status = "okay";
+};
+
+&rknpu_mmu {
+	status = "okay";
+};
+
+&gpu {
+	mali-supply = <&vdd_gpu_s0>;
+	mem-supply = <&vdd_gpu_mem_s0>;
+	status = "okay";
+};
+
+&mpp_srv {
+	status = "okay";
+};
+
+&iep {
+	status = "okay";
+};
+
+&iep_mmu {
+	status = "okay";
+};
+
+&rkvdec_ccu {
+	status = "okay";
+};
+
+&rkvdec0 {
+	status = "okay";
+};
+
+&rkvdec0_mmu {
+	status = "okay";
+};
+
+&rkvdec1 {
+	status = "okay";
+};
+
+&rkvdec1_mmu {
+	status = "okay";
+};
+
+&rkvenc_ccu {
+	status = "okay";
+};
+
+&rkvenc0 {
+	venc-supply = <&vdd_vdenc_s0>;
+	mem-supply = <&vdd_vdenc_mem_s0>;
+	status = "okay";
+};
+
+&rkvenc0_mmu {
+	status = "okay";
+};
+
+&rkvenc1 {
+	venc-supply = <&vdd_vdenc_s0>;
+	mem-supply = <&vdd_vdenc_mem_s0>;
+	status = "okay";
+};
+
+&rkvenc1_mmu {
+	status = "okay";
+};
+
+&vdpu {
+	status = "okay";
+};
+
+&vdpu_mmu {
+	status = "okay";
+};
+
+&vepu {
+	status = "okay";
+};
+
+&av1d {
+	status = "okay";
+};
+
+&av1d_mmu {
+	status = "okay";
+};
+
+&avsd {
+	status = "okay";
+};
+
+&jpegd {
+	status = "okay";
+};
+
+&jpegd_mmu {
+	status = "okay";
+};
+
+&jpege_ccu {
+	status = "okay";
+};
+
+&jpege0 {
+	status = "okay";
+};
+
+&jpege0_mmu {
+	status = "okay";
+};
+
+&jpege1 {
+	status = "okay";
+};
+
+&jpege1_mmu {
+	status = "okay";
+};
+
+&jpege2 {
+	status = "okay";
+};
+
+&jpege2_mmu {
+	status = "okay";
+};
+
+&jpege3 {
+	status = "okay";
+};
+
+&jpege3_mmu {
+	status = "okay";
+};
+
+&rga2 {
+	status = "okay";
+};
+
+&rga3_core0 {
+	status = "okay";
+};
+
+&rga3_0_mmu {
+	status = "okay";
+};
+
+&rga3_core1 {
+	status = "okay";
+};
+
+&rga3_1_mmu {
+	status = "okay";
+};

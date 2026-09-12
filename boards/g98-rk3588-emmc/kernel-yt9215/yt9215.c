@@ -1,0 +1,835 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Motorcomm YT9215S Unmanaged Ethernet Switch Driver
+ *
+ * mdio_driver: matches "motorcomm,yt9215s" as an MDIO device child.
+ *
+ * Ported to QNAP 5.10 (no CONFIG_SWCONFIG available) from
+ * https://github.com/baidxi/yt921x_switch (mirror: yifengyou/yt921x_switch):
+ * the swconfig glue (yt9215_sw.c), the netdev notifier and the link
+ * polling / VLAN carrier sync were dropped. The driver now only does
+ * chip init at probe: reset, PHY init, switch fabric init (default
+ * VLAN 1 = all ports forwarding, i.e. unmanaged) and the BDY-G98 LED
+ * serial-controller setup. After probe the four external ports forward
+ * to the RGMII CPU port without any userspace configuration.
+ *
+ * Device Tree binding (child of the host gmac's mdio node):
+ *
+ *	switch@1d {
+ *		compatible = "motorcomm,yt9215s";
+ *		reg = <0x1d>;
+ *		motorcomm,id = <0>;		// cascade unit id (informational)
+ *		motorcomm,cpu-port = <4>;	// swconfig index of CPU port
+ *		motorcomm,num-ports = <5>;
+ *		motorcomm,port-map = <1 2 3 4 9>; // swconfig idx -> switch MAC port
+ *	};
+ *
+ * Copyright (C) 2026
+ */
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/mdio.h>
+#include <linux/of.h>
+#include <linux/gpio/consumer.h>
+#include <linux/delay.h>
+#include <linux/slab.h>
+#include <linux/phy.h>
+#include <linux/bitops.h>
+#include <linux/mutex.h>
+#include <linux/err.h>
+
+/* ======================================================================
+ * Register definitions (formerly yt9215_regs.h)
+ * ==================================================================== */
+
+/* ---- Switch global registers (accessed via Clause-22 indirect SMI) ---- */
+#define YT9215_CHIP_ID_REG		0x80008	/* Chip ID (YT_SW_ID_9215=0x9002) */
+#define YT9215_INTERFACE_CTRL_REG	0x80028	/* Interface control */
+#define YT9215_CHIP_MODE_REG		0x80388	/* Chip mode */
+#define YT9215_CHIP_INTERFACE_SEL_REG	0x80394	/* Interface selection */
+#define YT9215_EXTIF1_MODE_REG		0x80408
+#define   EXTIF_MODE_XMII_MODE_OFFSET	29
+#define   EXTIF_MODE_XMII_MODE_MASK	(0x7U << 29)  /* unsigned: avoids sign-extend at bit 31 */
+#define   EXTIF_MODE_XMII_PORT_EN	BIT(18)
+#define   EXTIF_MODE_RGMII		4	/* YT_EXTIF_MODE_RGMII */
+#define   CHIP_IFSEL_PORT9_XMII		BIT(0)	/* extif_bit for port 9 (extif_id=1) */
+
+/* Chip ID values */
+#define YT9215_CHIP_ID_9215		0x9002
+#define YT9215_CHIP_ID_9218		0x9001
+#define YT9215_GLOBAL_CTRL1_REG		0x80004
+#define   GLOBAL_CTRL1_MIB_EN		BIT(1)
+
+/* PORT_CTRLm (table 11): base 0x80100, stride 4.
+ * Field layout (verified against SDK fal_tiger_struct.c port_ctrlm_field[]):
+ *   [10] FLOW_LINK_AN  [9] AN_LINK_EN  [8] HALF_FC_EN
+ *   [7]  DUPLEX_MODE   [6] RX_FC_EN    [5] TX_FC_EN
+ *   [4]  RXMAC_EN      [3] TXMAC_EN    [2:0] SPEED_MODE
+ */
+#define YT9215_PORT_CTRL_REG(macid)	(0x80100 + ((macid) * 0x4))
+#define   PORT_CTRL_FLOW_LINK_AN	BIT(10)
+#define   PORT_CTRL_AN_LINK_EN		BIT(9)
+#define   PORT_CTRL_DUPLEX_MODE		BIT(7)
+#define   PORT_CTRL_RX_FC_EN		BIT(6)
+#define   PORT_CTRL_TX_FC_EN		BIT(5)
+#define   PORT_CTRL_RXMAC_EN		BIT(4)
+#define   PORT_CTRL_TXMAC_EN		BIT(3)
+#define   PORT_CTRL_SPEED_MODE_OFFSET	0
+#define   PORT_CTRL_SPEED_MODE_MASK	(0x7 << 0)
+#define   PORT_CTRL_SPEED_1000M		2	/* PORT_SPEED_1000M */
+
+/* PORT_STATUSm (table 12): base 0x80200, stride 4 */
+#define YT9215_PORT_STATUS_REG(macid)	(0x80200 + ((macid) * 0x4))
+#define   PORT_STATUS_LINK		BIT(8)
+#define   PORT_STATUS_DUPLEX		BIT(7)
+#define   PORT_STATUS_RX_FC		BIT(6)
+#define   PORT_STATUS_TX_FC		BIT(5)
+#define   PORT_STATUS_SPEED_OFFSET	0
+#define   PORT_STATUS_SPEED_MASK	(0x7 << 0)
+
+/* PORT_VLAN_CTRLNm (table 45): base 0x230010, stride 4
+ *   DEFAULT_CVID is bits [17:6] (width 12)
+ */
+#define YT9215_PORT_VLAN_CTRLN_REG(macid)  (0x230010 + ((macid) * 0x4))
+#define   PORT_VLAN_CTRLN_DEFAULT_CVID_OFFSET	6
+#define   PORT_VLAN_CTRLN_DEFAULT_CVID_MASK	(0xfff << 6)
+#define YT9215_PORT_VLAN_CTRL1N_REG(macid)	(0x230080 + ((macid) * 0x4))
+#define   PORT_VLAN_CTRL1N_CTAG_AFT_MASK	(0x3U << 0)
+#define   PORT_VLAN_CTRL1N_STAG_AFT_MASK	(0x3U << 2)
+#define   VLAN_AFT_ALL				0
+#define YT9215_EGR_PORT_VLAN_CTRLN_REG(macid)	(0x100080 + ((macid) * 0x4))
+#define   EGR_PORT_VLAN_CTRLN_CTAG_MODE_OFFSET	12
+#define   EGR_PORT_VLAN_CTRLN_CTAG_MODE_MASK	(0x7U << 12)
+#define   EGR_CTAG_MODE_ENTRY_BASED		5
+#define YT9215_TPID_PROFILE0_REG		0x210000	/* ingress TPID profile 0 */
+#define YT9215_EGR_TPID_PROFILE0_REG		0x100300	/* egress TPID profile 0 */
+#define YT9215_TPID_8100			0x8100
+
+/* PARSER_PORT_CTRLNm: base 0x210010, stride 4 (per MAC). CTAG_TPID_MASK [3:0]
+ * is a bitmask of which TPID profiles the port accepts as C-tags.
+ */
+#define YT9215_PARSER_PORT_CTRLN_REG(macid)	(0x210010 + ((macid) * 0x4))
+#define   PARSER_PORT_CTRLN_CTAG_TPID_MASK_OFFSET	0
+#define   PARSER_PORT_CTRLN_CTAG_TPID_MASK_MASK	(0xfU << 0)
+#define   PARSER_TPID_PROFILE0			0x1	/* accept TPID profile 0 (0x8100) */
+
+/* EGR_PORT_CTRLNm: base 0x100000, stride 4 (per MAC). CTAG_TPID_SEL [5:4]
+ * selects which egress TPID profile is used when adding a C-tag.
+ */
+#define YT9215_EGR_PORT_CTRLN_REG(macid)	(0x100000 + ((macid) * 0x4))
+#define   EGR_PORT_CTRLN_CTAG_TPID_SEL_OFFSET	4
+#define   EGR_PORT_CTRLN_CTAG_TPID_SEL_MASK	(0x3U << 4)
+#define   EGR_TPID_PROFILE0			0	/* profile 0 = 0x8100 */
+
+/* L2_VLAN_TBLm (table 187): base 0x188000, stride 8 (2 words/entry), 4096
+ *   entries (per VID). PORT_MEMBER_BITMAP is bits [17:7] of word 0 (+0).
+ */
+#define YT9215_VLAN_TBL_REG(vid)	(0x188000 + ((vid) * 0x8))
+#define   VLAN_TBL_PORT_MEMBER_OFFSET	7	/* word0 (+0) bits [17:7] */
+#define   VLAN_TBL_PORT_MEMBER_MASK	(0x7ff << 7)
+/* Each entry is 2 words; word1 (+4) holds UNTAG_MEMBER_BITMAP [18:8].
+ * The entry latches only when word1 is written (SDK writes both words).
+ */
+#define   VLAN_TBL_UNTAG_OFFSET		8
+#define   VLAN_TBL_UNTAG_MASK		(0x7ff << 8)
+
+/* L2_PORT_ISOLATION_CTRLNm (table 120): base 0x180294, stride 4 */
+#define YT9215_PORT_ISOLATION_REG(macid) (0x180294 + ((macid) * 0x4))
+#define   PORT_ISOLATION_MASK_OFFSET	0
+#define   PORT_ISOLATION_MASK_WIDTH	11
+
+#define YT9215_SWCONFIG_PORTS	5
+#define YT9215_CPU_PORT		4  /* swconfig index of CPU port */
+
+/* Map swconfig port index -> internal PHY MDIO address (-1 = no PHY) */
+static inline int yt9215_phyaddr(int swconfig_port)
+{
+	if (swconfig_port >= 0 && swconfig_port <= 3)
+		return swconfig_port + 1;  /* ports 0-3 -> PHY 1-4 */
+	return -1;  /* CPU port has no PHY */
+}
+
+#define YT9215_MAX_VLANS	4096
+
+/* ---- Internal PHY indirect access (INT_IF) ---- */
+#define YT9215_INT_IF_FRAME_CTRL	0xf0000
+#define YT9215_INT_IF_ADDR_CTRL		0xf0004
+#define YT9215_INT_IF_DATA_0		0xf0008
+#define YT9215_INT_IF_DATA_1		0xf000c
+
+#define INT_IF_OP_WRITE			1
+#define INT_IF_OP_READ			2
+#define INT_IF_BUSY_WAIT_MAX		10
+
+/* ---- External PHY indirect access (EXT_IF) ---- */
+#define YT9215_EXT_IF_FRAME_CTRL	0x6a000
+#define YT9215_EXT_IF_ADDR_CTRL		0x6a004
+#define YT9215_EXT_IF_DATA_0		0x6a008
+#define YT9215_EXT_IF_DATA_1		0x6a00c
+
+/* ---- Global control / operation ---- */
+#define YT9215_E_OP_CTRL_0		0xe0000
+#define YT9215_E_OP_CTRL_1		0xe0004
+
+#define YT9215_LED_GLB_CTRL			0xd0000
+#define YT9215_LED_CTRL_0_BASE			0xd0004 /* LED0 action, per MAC, stride 4 */
+#define YT9215_LED_CTRL_1_BASE			0xd0040 /* LED1 action */
+#define YT9215_LED_CTRL_2_BASE			0xd0080 /* LED2 action */
+#define YT9215_LED_SERIAL_CTRL			0xd0100
+#define YT9215_LED_SERIAL_REMAPPING_BASE	0xd0104
+
+/* LED_GLB_CTRL bitfields */
+#define   LED_GLB_MODE_OFFSET			0
+#define   LED_GLB_MODE_MASK			(0x3U << 0)
+#define   LED_GLB_MODE_SERIAL			2	/* LED_MODE_SERIAL */
+#define   LED_GLB_SERIAL_PORT_NUM_OFFSET	13	/* [16:13] serial port count */
+#define   LED_GLB_SERIAL_PORT_NUM_MASK		(0xfU << 13)
+#define   LED_GLB_SERIAL_PORT_NUM_7		7	/* 7 ports (YT9215_21) */
+#define   LED_GLB_ENABLE			BIT(21)	/* global LED enable */
+
+/* LED_SERIAL_CTRL bitfields */
+#define   LED_SERIAL_PIN_NUM_MASK		(0x3U << 0)	/* [1:0] ledNum-1 */
+#define   LED_SERIAL_PIN_NUM_3			2		/* 3 LED pins */
+#define   LED_SERIAL_ACTIVE_MODE_BIT		BIT(4)		/* 1 = active low */
+#define   LED_SERIAL_ENABLE_MASK		(0x3U << 24)	/* [25:24] serial enable */
+
+#define   LED_ACTION_10M_ON			BIT(4)		/* 0x0010 link @10M  */
+#define   LED_ACTION_100M_ON			BIT(5)		/* 0x0020 link @100M */
+#define   LED_ACTION_1000M_ON			BIT(6)		/* 0x0040 link @1000M*/
+#define   LED_ACTION_RXACT_BLINK		BIT(9)		/* 0x0200 blink on RX */
+#define   LED_ACTION_TXACT_BLINK		BIT(10)		/* 0x0400 blink on TX */
+#define   LED_ACTION_ACTIVE_BLINK_INDICATE	BIT(13)		/* 0x2000 CLEAR: lights w/o link */
+#define   LED_ACTION_LOOPDETECT_INDICATE	BIT(14)		/* 0x4000 CLEAR: lights w/o link */
+#define   LED_ACTION_DISABLE_LINK_TRY		BIT(17)		/* 0x20000 LED0 only */
+
+#define   LED0_ACTION_VALUE							\
+	(LED_ACTION_10M_ON | LED_ACTION_100M_ON | LED_ACTION_1000M_ON |	\
+	 LED_ACTION_RXACT_BLINK | LED_ACTION_TXACT_BLINK |		\
+	 LED_ACTION_DISABLE_LINK_TRY)
+
+/* ======================================================================
+ * Private data (formerly yt9215.h, swconfig fields removed)
+ * ==================================================================== */
+
+struct yt9215_priv {
+	struct device *dev;
+
+	/* MDIO / bus access */
+	struct mii_bus *host_mii;	/* Host MDIO bus (e.g. mdio0/mdio1) */
+	u8 unit_id;			/* Switch ID for cascade (motorcomm,id) */
+	u8 base_addr;			/* MDIO Clause-22 address (default 0x1d) */
+
+	/* GPIO reset */
+	struct gpio_desc *reset_gpio;
+
+	/* Regmap / lock */
+	struct mutex reg_lock;
+
+	/* Chip info */
+	u16 chip_id;
+	u8 cpu_port;
+	u8 num_ports;
+	u8 internal_phy_count;
+	bool vlan_enabled;
+	u8 port_map[YT9215_SWCONFIG_PORTS];
+};
+
+/* ======================================================================
+ * Register access layer (formerly yt9215_reg.c)
+ * ==================================================================== */
+
+#define SMI_SLOT_ADDR_WRITE (0<<1 | 0)
+#define SMI_SLOT_ADDR_READ  (0<<1 | 1)
+#define SMI_SLOT_DATA_WRITE (1<<1 | 0)
+#define SMI_SLOT_DATA_READ  (1<<1 | 1)
+
+static inline u8 __smi_slot(struct yt9215_priv *p, int slot)
+{
+	return (u8)slot;
+}
+
+static int yt9215_reg_write(struct yt9215_priv *p, u32 reg, u32 val)
+{
+	struct mii_bus *bus = p->host_mii;
+	int addr = p->base_addr;
+	u8 s;
+	int ret;
+
+	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
+
+	s = __smi_slot(p, SMI_SLOT_ADDR_WRITE);
+	ret = __mdiobus_write(bus, addr, s, (u16)(reg >> 16));
+	if (ret) goto out;
+	ret = __mdiobus_write(bus, addr, s, (u16)(reg & 0xffff));
+	if (ret) goto out;
+
+	s = __smi_slot(p, SMI_SLOT_DATA_WRITE);
+	ret = __mdiobus_write(bus, addr, s, (u16)(val >> 16));
+	if (ret) goto out;
+	ret = __mdiobus_write(bus, addr, s, (u16)(val & 0xffff));
+
+out:
+	mutex_unlock(&bus->mdio_lock);
+	return ret;
+}
+
+static int yt9215_reg_read(struct yt9215_priv *p, u32 reg, u32 *val)
+{
+	struct mii_bus *bus = p->host_mii;
+	int addr = p->base_addr;
+	u8 s;
+	u32 v;
+	int res;
+
+	mutex_lock_nested(&bus->mdio_lock, MDIO_MUTEX_NESTED);
+
+	s = __smi_slot(p, SMI_SLOT_ADDR_READ);
+	res = __mdiobus_write(bus, addr, s, (u16)(reg >> 16));
+	if (res) goto out;
+	res = __mdiobus_write(bus, addr, s, (u16)(reg & 0xffff));
+	if (res) goto out;
+
+	s = __smi_slot(p, SMI_SLOT_DATA_READ);
+	res = __mdiobus_read(bus, addr, s);
+	if (res < 0) goto out;
+	v = (u16)res;
+	res = __mdiobus_read(bus, addr, s);
+	if (res < 0) goto out;
+	v = (v << 16) | (u16)res;
+
+	*val = v;
+	res = 0;
+out:
+	mutex_unlock(&bus->mdio_lock);
+	return res;
+}
+
+static int yt9215_reg_set(struct yt9215_priv *p, u32 reg, u32 mask, u32 set)
+{
+	u32 val;
+	int ret;
+
+	ret = yt9215_reg_read(p, reg, &val);
+	if (ret) return ret;
+	val = (val & ~mask) | (set & mask);
+	return yt9215_reg_write(p, reg, val);
+}
+
+/* Internal PHY access via 0xf0000 indirect controller */
+static int yt9215_phy_write(struct yt9215_priv *p, u8 phy, u32 reg, u16 val)
+{
+	u32 addr_ctrl;
+	int i, ret;
+
+	if (reg > 0x1f) {
+		ret = yt9215_phy_write(p, phy, 0x1e, (u16)reg);
+		if (ret) return ret;
+		return yt9215_phy_write(p, phy, 0x1f, val);
+	}
+
+	addr_ctrl = ((u32)(phy & 0x1f) << 21) |
+		    ((u32)(reg & 0x1f) << 16) |
+		    (INT_IF_OP_WRITE << 2);
+
+	ret = yt9215_reg_write(p, YT9215_INT_IF_ADDR_CTRL, addr_ctrl);
+	if (ret) return ret;
+	ret = yt9215_reg_write(p, YT9215_INT_IF_DATA_0, val);
+	if (ret) return ret;
+	ret = yt9215_reg_write(p, YT9215_INT_IF_FRAME_CTRL, 1);
+	if (ret) return ret;
+
+	for (i = 0; i < INT_IF_BUSY_WAIT_MAX; i++) {
+		u32 status;
+		ret = yt9215_reg_read(p, YT9215_INT_IF_FRAME_CTRL, &status);
+		if (ret) return ret;
+		if (!status) return 0;
+		udelay(1);
+	}
+	dev_err(p->dev, "PHY write timeout phy=%d reg=0x%04x\n", phy, reg);
+	return -ETIMEDOUT;
+}
+
+static int yt9215_phy_read(struct yt9215_priv *p, u8 phy, u32 reg, u16 *val)
+{
+	u32 addr_ctrl, data;
+	int i, ret;
+
+	if (reg > 0x1f) {
+		ret = yt9215_phy_write(p, phy, 0x1e, (u16)reg);
+		if (ret) return ret;
+		return yt9215_phy_read(p, phy, 0x1f, val);
+	}
+
+	addr_ctrl = ((u32)(phy & 0x1f) << 21) |
+		    ((u32)(reg & 0x1f) << 16) |
+		    (INT_IF_OP_READ << 2);
+
+	ret = yt9215_reg_write(p, YT9215_INT_IF_ADDR_CTRL, addr_ctrl);
+	if (ret) return ret;
+	ret = yt9215_reg_write(p, YT9215_INT_IF_FRAME_CTRL, 1);
+	if (ret) return ret;
+
+	for (i = 0; i < INT_IF_BUSY_WAIT_MAX; i++) {
+		u32 status;
+		ret = yt9215_reg_read(p, YT9215_INT_IF_FRAME_CTRL, &status);
+		if (ret) return ret;
+		if (!status) {
+			ret = yt9215_reg_read(p, YT9215_INT_IF_DATA_1, &data);
+			if (ret) return ret;
+			*val = (u16)data;
+			return 0;
+		}
+		udelay(1);
+	}
+	dev_err(p->dev, "PHY read timeout phy=%d reg=0x%04x\n", phy, reg);
+	return -ETIMEDOUT;
+}
+
+/* ======================================================================
+ * Core (formerly yt9215_core.c, swconfig parts removed)
+ * ==================================================================== */
+
+static const struct {
+	u8 serial_id;
+	u8 led_id;
+} yt9215_sled21_remap[21] = {
+	{9, 0}, {8, 0}, {4, 0}, {3, 0}, {2, 0}, {1, 0}, {0, 0},
+	{9, 1}, {8, 1}, {4, 1}, {3, 1}, {2, 1}, {1, 1}, {0, 1},
+	{9, 2}, {8, 2}, {4, 2}, {3, 2}, {2, 2}, {1, 2}, {0, 2}
+};
+
+static const struct {
+	u8 port;
+	u8 led_id;
+} yt9215_led_remap[21] = {
+	{6, 1}, {4, 0}, {5, 1}, {3, 0}, {2, 0}, {1, 0}, {0, 0},
+	{6, 0}, {5, 0}, {4, 1}, {3, 1}, {2, 1}, {1, 1}, {0, 1},
+	{6, 2}, {5, 2}, {4, 2}, {3, 2}, {2, 2}, {1, 2}, {0, 2}
+};
+
+static int yt9215_swport(struct yt9215_priv *p, int swconfig_port)
+{
+	if (swconfig_port < 0 || swconfig_port >= p->num_ports)
+		return -1;
+	return p->port_map[swconfig_port];
+}
+
+/* ---- GPIO reset ---- */
+static int yt9215_reset(struct yt9215_priv *p)
+{
+	if (!p->reset_gpio)
+		return 0;
+
+	gpiod_set_value_cansleep(p->reset_gpio, 1);
+	msleep(10);
+	gpiod_set_value_cansleep(p->reset_gpio, 0);
+	msleep(50);
+
+	dev_info(p->dev, "chip reset complete\n");
+	return 0;
+}
+
+/* ---- Chip detection ---- */
+static int yt9215_detect(struct yt9215_priv *p)
+{
+	struct mii_bus *bus = p->host_mii;
+	int addr = p->base_addr;
+	u32 val;
+	u32 chip_id_val = 0;
+	int ret;
+
+	ret = yt9215_reg_read(p, YT9215_CHIP_ID_REG, &val);
+	if (ret)
+		dev_err(p->dev, "SMI read CHIP_ID failed: %d\n", ret);
+	else
+		dev_info(p->dev, "SMI read CHIP_ID = 0x%08x\n", val);
+	chip_id_val = val;
+
+	/* CHIP_ID (0x80008) holds the ID in the upper 16 bits (0x9002). */
+	if (chip_id_val != 0 && chip_id_val != 0xffffffff)
+		p->chip_id = (u16)((chip_id_val >> 16) & 0xffff);
+	else
+		p->chip_id = YT9215_CHIP_ID_9215;
+
+	dev_info(p->dev, "chip_id = 0x%04x (%s)\n", p->chip_id,
+		 p->chip_id == YT9215_CHIP_ID_9215 ? "YT9215" :
+		 p->chip_id == YT9215_CHIP_ID_9218 ? "YT9218" : "unknown");
+
+	return 0;
+}
+
+/* ---- Internal PHY initialisation (port of int_yt861x_init) ---- */
+static int yt9215_phy_init(struct yt9215_priv *p)
+{
+	int i, ret, phy_addr;
+	u16 reg;
+
+	p->internal_phy_count = 4;  /* swconfig ports 0-3 */
+
+	/* Initialise internal PHYs at MDIO addresses 1-4 */
+	for (i = 0; i < YT9215_SWCONFIG_PORTS; i++) {
+		phy_addr = yt9215_phyaddr(i);
+		if (phy_addr < 0)
+			continue;  /* CPU port (swconfig 4) has no PHY */
+		if (p->chip_id == YT9215_CHIP_ID_9218) {
+			ret = yt9215_phy_read(p, phy_addr, 0x50, &reg);
+			if (ret)
+				return ret;
+			reg &= 0xF3FF;
+			yt9215_phy_write(p, phy_addr, 0x50, reg);
+		}
+
+		ret = yt9215_phy_read(p, phy_addr, 0x408, &reg);
+		if (ret)
+			return ret;
+		reg &= 0x0FFFE;
+		yt9215_phy_write(p, phy_addr, 0x408, reg);
+
+		ret = yt9215_phy_read(p, phy_addr, 0x29, &reg);
+		if (ret)
+			return ret;
+		reg &= ~0x3F;
+		reg |= 0x8;
+		yt9215_phy_write(p, phy_addr, 0x29, reg);
+
+		ret = yt9215_phy_read(p, phy_addr, 0x3a9, &reg);
+		if (ret)
+			return ret;
+		reg &= ~0x3F;
+		reg |= 0x17;
+		yt9215_phy_write(p, phy_addr, 0x3a9, reg);
+
+		yt9215_phy_write(p, phy_addr, 0x00, 0x1240);
+	}
+
+	dev_info(p->dev, "internal PHYs initialised (PHY addr 1-4)\n");
+	return 0;
+}
+
+static u8 yt9215_led_port_to_mac(u8 port)
+{
+	static const u8 mac[7] = { 0, 1, 2, 3, 4, 8, 9 };
+
+	return (port < 7) ? mac[port] : port;
+}
+
+static int yt9215_led_serial_remapping_set(struct yt9215_priv *p, int index)
+{
+	u32 src_mac = yt9215_sled21_remap[index].serial_id;
+	u8 slot_led = yt9215_sled21_remap[index].led_id;
+	u32 reg = YT9215_LED_SERIAL_REMAPPING_BASE +
+		  (2 - slot_led) * 8 + (src_mac / 5) * 4;
+	u32 dst_mac = yt9215_led_port_to_mac(yt9215_led_remap[index].port);
+	u32 dst_led = yt9215_led_remap[index].led_id;
+	u32 shift = (src_mac % 5) * 6;
+	u32 mask, val;
+	int ret;
+
+	ret = yt9215_reg_read(p, reg, &val);
+	if (ret)
+		return ret;
+	mask = (0xfU << (shift + 2)) | (0x3U << shift);
+	val = (val & ~mask) |
+	      ((dst_mac & 0xfU) << (shift + 2)) |
+	      ((dst_led & 0x3U) << shift);
+	return yt9215_reg_write(p, reg, val);
+}
+
+static int yt9215_led_init(struct yt9215_priv *p)
+{
+	u32 val;
+	int i, ret;
+
+	/* 1. LED mode = serial; serial port count = 7 (LED_GLB_CTRL[16:13]). */
+	ret = yt9215_reg_set(p, YT9215_LED_GLB_CTRL,
+			     LED_GLB_MODE_MASK, LED_GLB_MODE_SERIAL);
+	if (ret)
+		return ret;
+	ret = yt9215_reg_set(p, YT9215_LED_GLB_CTRL,
+			     LED_GLB_SERIAL_PORT_NUM_MASK,
+			     LED_GLB_SERIAL_PORT_NUM_7 <<
+			     LED_GLB_SERIAL_PORT_NUM_OFFSET);
+	if (ret)
+		return ret;
+
+	/* 2. Active mode = low (bit4); serial pin count = 3 LEDs ([1:0]=2). */
+	ret = yt9215_reg_set(p, YT9215_LED_SERIAL_CTRL,
+			     LED_SERIAL_ACTIVE_MODE_BIT, LED_SERIAL_ACTIVE_MODE_BIT);
+	if (ret)
+		return ret;
+	ret = yt9215_reg_set(p, YT9215_LED_SERIAL_CTRL,
+			     LED_SERIAL_PIN_NUM_MASK, LED_SERIAL_PIN_NUM_3);
+	if (ret)
+		return ret;
+
+	/* 3. Serial LED remapping table (21 slots). */
+	for (i = 0; i < 21; i++) {
+		ret = yt9215_led_serial_remapping_set(p, i);
+		if (ret)
+			return ret;
+	}
+
+	for (i = 0; i < 10; i++) {
+		ret = yt9215_reg_write(p, YT9215_LED_CTRL_0_BASE + i * 4,
+				       LED0_ACTION_VALUE);
+		if (ret)
+			return ret;
+	}
+
+	/* 5. Enable the serial LED engine + global LED controller. */
+	ret = yt9215_reg_set(p, YT9215_LED_SERIAL_CTRL,
+			     LED_SERIAL_ENABLE_MASK, LED_SERIAL_ENABLE_MASK);
+	if (ret)
+		return ret;
+	ret = yt9215_reg_set(p, YT9215_LED_GLB_CTRL,
+			     LED_GLB_ENABLE, LED_GLB_ENABLE);
+	if (ret)
+		return ret;
+
+	yt9215_reg_read(p, YT9215_LED_GLB_CTRL, &val);
+	dev_info(p->dev, "LED init: LED_GLB_CTRL=0x%08x\n", val);
+	yt9215_reg_read(p, YT9215_LED_SERIAL_CTRL, &val);
+	dev_info(p->dev, "LED init: LED_SERIAL_CTRL=0x%08x\n", val);
+
+	return 0;
+}
+
+static int yt9215_set_default_vlan(struct yt9215_priv *p)
+{
+	u32 member = 0, untag = 0;
+	int i, mac;
+
+	for (i = 0; i < p->num_ports; i++) {
+		mac = yt9215_swport(p, i);
+		if (mac < 0)
+			continue;
+		member |= BIT(mac);
+		if (i != p->cpu_port)
+			untag |= BIT(mac);
+	}
+
+	yt9215_reg_write(p, YT9215_VLAN_TBL_REG(1),
+			 member << VLAN_TBL_PORT_MEMBER_OFFSET);
+	yt9215_reg_write(p, YT9215_VLAN_TBL_REG(1) + 4,
+			 untag << VLAN_TBL_UNTAG_OFFSET);
+
+	for (i = 0; i < p->num_ports; i++) {
+		mac = yt9215_swport(p, i);
+		if (mac < 0)
+			continue;
+		yt9215_reg_set(p, YT9215_PORT_VLAN_CTRLN_REG(mac),
+			       PORT_VLAN_CTRLN_DEFAULT_CVID_MASK,
+			       1 << PORT_VLAN_CTRLN_DEFAULT_CVID_OFFSET);
+	}
+
+	return 0;
+}
+
+static int yt9215_setup_vlan_mode(struct yt9215_priv *p)
+{
+	int i, mac, ret;
+
+	ret = yt9215_reg_write(p, YT9215_TPID_PROFILE0_REG, YT9215_TPID_8100);
+	if (ret)
+		return ret;
+	ret = yt9215_reg_write(p, YT9215_EGR_TPID_PROFILE0_REG, YT9215_TPID_8100);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < p->num_ports; i++) {
+		mac = yt9215_swport(p, i);
+		if (mac < 0)
+			continue;
+
+		/* ingress: recognise TPID profile 0 (0x8100) as a C-tag */
+		ret = yt9215_reg_set(p, YT9215_PARSER_PORT_CTRLN_REG(mac),
+				     PARSER_PORT_CTRLN_CTAG_TPID_MASK_MASK,
+				     PARSER_TPID_PROFILE0);
+		if (ret)
+			return ret;
+
+		/* ingress admission filter: admit all */
+		ret = yt9215_reg_set(p, YT9215_PORT_VLAN_CTRL1N_REG(mac),
+				     PORT_VLAN_CTRL1N_CTAG_AFT_MASK |
+				     PORT_VLAN_CTRL1N_STAG_AFT_MASK,
+				     VLAN_AFT_ALL);
+		if (ret)
+			return ret;
+
+		/* egress: use TPID profile 0 (0x8100) when adding a C-tag */
+		ret = yt9215_reg_set(p, YT9215_EGR_PORT_CTRLN_REG(mac),
+				     EGR_PORT_CTRLN_CTAG_TPID_SEL_MASK, 0);
+		if (ret)
+			return ret;
+
+		/* egress tag mode: entry-based (VLAN table controls tagging) */
+		ret = yt9215_reg_set(p, YT9215_EGR_PORT_VLAN_CTRLN_REG(mac),
+				     EGR_PORT_VLAN_CTRLN_CTAG_MODE_MASK,
+				     (u32)EGR_CTAG_MODE_ENTRY_BASED <<
+				     EGR_PORT_VLAN_CTRLN_CTAG_MODE_OFFSET);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+/* ---- Switch fabric initialisation ---- */
+static int yt9215_switch_init(struct yt9215_priv *p)
+{
+	int i, ret;
+
+	/* Enable MIB counters */
+	yt9215_reg_set(p, YT9215_GLOBAL_CTRL1_REG, GLOBAL_CTRL1_MIB_EN,
+		       GLOBAL_CTRL1_MIB_EN);
+
+	for (i = 0; i < p->num_ports; i++) {
+		if (i == YT9215_CPU_PORT)
+			continue;
+		yt9215_reg_set(p, YT9215_PORT_CTRL_REG(yt9215_swport(p, i)),
+			       PORT_CTRL_FLOW_LINK_AN | PORT_CTRL_AN_LINK_EN |
+			       PORT_CTRL_RXMAC_EN | PORT_CTRL_TXMAC_EN,
+			       PORT_CTRL_FLOW_LINK_AN | PORT_CTRL_AN_LINK_EN |
+			       PORT_CTRL_RXMAC_EN | PORT_CTRL_TXMAC_EN);
+	}
+
+	/* 1. Select xMII mode for port 9 (extif_bit=0) */
+	yt9215_reg_set(p, YT9215_CHIP_INTERFACE_SEL_REG,
+		       CHIP_IFSEL_PORT9_XMII, CHIP_IFSEL_PORT9_XMII);
+
+	/* 2. EXTIF1_MODE: XMII_MODE[31:29]=RGMII(4), XMII_PORT_EN[18]=1 */
+	yt9215_reg_set(p, YT9215_EXTIF1_MODE_REG,
+		       EXTIF_MODE_XMII_MODE_MASK | EXTIF_MODE_XMII_PORT_EN,
+		       ((u32)EXTIF_MODE_RGMII << EXTIF_MODE_XMII_MODE_OFFSET) |
+		       EXTIF_MODE_XMII_PORT_EN);
+
+	/* 3. Force CPU port MAC: disable AN, 1000M full-duplex,
+	 *    enable RX/TX flow-control and RX/TX MAC.
+	 */
+	yt9215_reg_set(p, YT9215_PORT_CTRL_REG(yt9215_swport(p, YT9215_CPU_PORT)),
+		       PORT_CTRL_FLOW_LINK_AN | PORT_CTRL_AN_LINK_EN |
+		       PORT_CTRL_DUPLEX_MODE | PORT_CTRL_RX_FC_EN |
+		       PORT_CTRL_TX_FC_EN | PORT_CTRL_RXMAC_EN |
+		       PORT_CTRL_TXMAC_EN | PORT_CTRL_SPEED_MODE_MASK,
+		       PORT_CTRL_DUPLEX_MODE | PORT_CTRL_RX_FC_EN |
+		       PORT_CTRL_TX_FC_EN | PORT_CTRL_RXMAC_EN |
+		       PORT_CTRL_TXMAC_EN |
+		       (PORT_CTRL_SPEED_1000M << PORT_CTRL_SPEED_MODE_OFFSET));
+
+	p->vlan_enabled = true;
+	yt9215_set_default_vlan(p);
+
+	ret = yt9215_setup_vlan_mode(p);
+	if (ret)
+		return ret;
+
+	/* LED serial controller (BDY-G98 config). Non-fatal on error. */
+	ret = yt9215_led_init(p);
+	if (ret)
+		dev_warn(p->dev, "LED init failed: %d\n", ret);
+
+	dev_info(p->dev, "switch fabric initialised (default VLAN 1)\n");
+	return 0;
+}
+
+/* ---- mdio_driver probe ---- */
+static int yt9215_probe(struct mdio_device *mdiodev)
+{
+	struct device *dev = &mdiodev->dev;
+	u32 cpu_port = YT9215_CPU_PORT;
+	u32 num_ports = YT9215_SWCONFIG_PORTS;
+	struct yt9215_priv *p;
+	u32 map[YT9215_SWCONFIG_PORTS];
+	u32 id;
+	int ret;
+	int i;
+
+	p = devm_kzalloc(dev, sizeof(*p), GFP_KERNEL);
+	if (!p)
+		return -ENOMEM;
+
+	p->dev = dev;
+	dev_set_drvdata(dev, p);
+	mutex_init(&p->reg_lock);
+
+	/* MDIO bus and address from mdiodev */
+	p->host_mii = mdiodev->bus;
+	p->base_addr = mdiodev->addr;
+
+	/* motorcomm,id */
+	if (of_property_read_u32(dev->of_node, "motorcomm,id", &id))
+		id = 0;
+	p->unit_id = (u8)id;
+
+	/* reset-gpios */
+	p->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_ASIS);
+	if (IS_ERR(p->reset_gpio))
+		return dev_err_probe(dev, PTR_ERR(p->reset_gpio),
+				     "failed to get reset GPIO\n");
+
+	/* Reset */
+	ret = yt9215_reset(p);
+	if (ret)
+		return ret;
+
+	/* Detect */
+	ret = yt9215_detect(p);
+	if (ret)
+		return ret;
+
+	of_property_read_u32(dev->of_node, "motorcomm,cpu-port",
+				&cpu_port);
+	of_property_read_u32(dev->of_node, "motorcomm,num-ports",
+				&num_ports);
+	p->cpu_port = (u8)cpu_port;
+	p->num_ports = (u8)num_ports;
+
+	if (of_property_read_u32_array(dev->of_node, "motorcomm,port-map",
+					map, YT9215_SWCONFIG_PORTS)) {
+		return dev_err_probe(dev, -EINVAL,
+			"missing/invalid required motorcomm,port-map property\n");
+	}
+	for (i = 0; i < YT9215_SWCONFIG_PORTS; i++)
+		p->port_map[i] = (u8)map[i];
+
+	/* PHY init */
+	ret = yt9215_phy_init(p);
+	if (ret)
+		return dev_err_probe(dev, ret, "PHY init failed\n");
+
+	/* Switch init */
+	ret = yt9215_switch_init(p);
+	if (ret)
+		return dev_err_probe(dev, ret, "switch init failed\n");
+
+	dev_info(dev, "probe done (mdio=0x%02x)\n", p->base_addr);
+	return 0;
+}
+
+static void yt9215_remove(struct mdio_device *mdiodev)
+{
+	dev_info(&mdiodev->dev, "unregistered\n");
+}
+
+static const struct of_device_id yt9215_of_match[] = {
+	{ .compatible = "motorcomm,yt9215s" },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, yt9215_of_match);
+
+static struct mdio_driver yt9215_driver = {
+	.mdiodrv = {
+		.driver = {
+			.name = "yt9215",
+			.of_match_table = yt9215_of_match,
+		},
+	},
+	.probe	= yt9215_probe,
+	.remove	= yt9215_remove,
+};
+
+mdio_module_driver(yt9215_driver);
+
+MODULE_DESCRIPTION("Motorcomm YT9215S unmanaged Ethernet switch driver");
+MODULE_AUTHOR("juno@baidxi404629@gmail.com");
+MODULE_LICENSE("GPL");

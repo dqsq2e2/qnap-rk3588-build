@@ -1,0 +1,53 @@
+diff --git a/drivers/net/dsa/Kconfig b/drivers/net/dsa/Kconfig
+index 2451f61..842c09c 100644
+--- a/drivers/net/dsa/Kconfig
++++ b/drivers/net/dsa/Kconfig
+@@ -132,4 +132,12 @@ config NET_DSA_VITESSE_VSC73XX_PLATFORM
+ 	  This enables support for the Vitesse VSC7385, VSC7388, VSC7395
+ 	  and VSC7398 SparX integrated ethernet switches, connected over
+ 	  a CPU-attached address bus and work in memory-mapped I/O mode.
++config NET_DSA_YT921X
++	tristate "Motorcomm YT9215 ethernet switch chip support"
++	depends on NET_DSA
++	select NET_DSA_TAG_YT921X
++	help
++	  This enables support for the Motorcomm YT9215 ethernet switch
++	  chip.
++
+ endmenu
+diff --git a/drivers/net/dsa/Makefile b/drivers/net/dsa/Makefile
+index 4a943cc..4f57851 100644
+--- a/drivers/net/dsa/Makefile
++++ b/drivers/net/dsa/Makefile
+@@ -17,6 +17,7 @@ obj-$(CONFIG_NET_DSA_SMSC_LAN9303_MDIO) += lan9303_mdio.o
+ obj-$(CONFIG_NET_DSA_VITESSE_VSC73XX) += vitesse-vsc73xx-core.o
+ obj-$(CONFIG_NET_DSA_VITESSE_VSC73XX_PLATFORM) += vitesse-vsc73xx-platform.o
+ obj-$(CONFIG_NET_DSA_VITESSE_VSC73XX_SPI) += vitesse-vsc73xx-spi.o
++obj-$(CONFIG_NET_DSA_YT921X) 		+= yt921x.o
+ obj-y				+= b53/
+ obj-y				+= microchip/
+ obj-y				+= mv88e6xxx/
+diff --git a/net/dsa/Kconfig b/net/dsa/Kconfig
+index 1f9b9b1..be0e2e0 100644
+--- a/net/dsa/Kconfig
++++ b/net/dsa/Kconfig
+@@ -128,4 +128,10 @@ config NET_DSA_TAG_TRAILER
+ 	  Say Y or M if you want to enable support for tagging frames at
+ 	  with a trailed. e.g. Marvell 88E6060.
+ 
++config NET_DSA_TAG_YT921X
++	tristate "Tag driver for Motorcomm YT921x switches"
++	help
++	  Say Y or M if you want to enable support for tagging frames
++	  with Motorcomm YT921x switches.
++
+ endif
+diff --git a/net/dsa/Makefile b/net/dsa/Makefile
+index 4f47b20..8ed2f9d 100644
+--- a/net/dsa/Makefile
++++ b/net/dsa/Makefile
+@@ -18,3 +18,4 @@ obj-$(CONFIG_NET_DSA_TAG_OCELOT) += tag_ocelot.o
+ obj-$(CONFIG_NET_DSA_TAG_QCA) += tag_qca.o
+ obj-$(CONFIG_NET_DSA_TAG_SJA1105) += tag_sja1105.o
+ obj-$(CONFIG_NET_DSA_TAG_TRAILER) += tag_trailer.o
++obj-$(CONFIG_NET_DSA_TAG_YT921X) += tag_yt921x.o

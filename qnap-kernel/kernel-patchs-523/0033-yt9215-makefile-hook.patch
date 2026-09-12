@@ -1,0 +1,5 @@
+--- a/drivers/net/phy/Makefile
++++ b/drivers/net/phy/Makefile
+@@ -60,1 +60,2 @@
+ obj-$(CONFIG_MOTORCOMM_PHY)	+= motorcomm.o
++obj-$(CONFIG_YT9215_SWITCH)	+= yt9215.o

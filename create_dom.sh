@@ -1959,7 +1959,7 @@ check_dependencies() {
         build-essential gcc make cmake libssl-dev flex bison
         libncurses-dev libelf-dev bc rsync kmod lzop
         gcc-aarch64-linux-gnu git device-tree-compiler u-boot-tools
-        python2 ccache pv gdisk unzip gzip
+        ccache pv gdisk unzip gzip
         parted wget patch gawk udev cpio vim
     )
 
