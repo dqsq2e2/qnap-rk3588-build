@@ -103,6 +103,9 @@ patch_front()
 patch_back()
 {
 	sed -i 's/^\([[:space:]]*\)if \[ -f \/tmp\/update_img.sh \]; then$/\1\/sbin\/qnap_patch -p\n&/' /etc/init.d/update.sh
+	# 网络守护进程配置热同步：nm.conf 经 rescan 修正后推给运行中的 QVS 守护进程，
+	# 否则网络设置页吃旧模型（适配器无信息/实体网卡 0/0）。后台延时等 nmd 起来
+	( sleep 30; /usr/local/bin/nacli rescan >/dev/null 2>&1; /usr/local/sbin/qsh NetworkService.ncaas.sync_ini "path=/etc/config/nm.conf" >/dev/null 2>&1; /usr/local/sbin/qsh NetworkService.ncaas.write_back "path=all" >/dev/null 2>&1 ) &
 }
 
 while getopts ":fb" opt; do
