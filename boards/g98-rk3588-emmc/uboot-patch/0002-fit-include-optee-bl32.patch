@@ -1,0 +1,10 @@
+--- configs/rk3588_defconfig.orig
++++ configs/rk3588_defconfig
+@@ -235,6 +235,7 @@
+ CONFIG_OPTEE_CLIENT=y
+ CONFIG_OPTEE_V2=y
+ CONFIG_OPTEE_ALWAYS_USE_SECURITY_PARTITION=y
++CONFIG_ENABLE_BL32_FOR_SPECIFIC_BOARDS=y
+ CONFIG_USE_BOOTARGS=y
+ CONFIG_BOOTARGS="earlycon=uart8250,mmio32,0xfeb50000 ramoops.mem_address=0x110000 ramoops.mem_size=0xf0000 ramoops.console_size=0x80000 uboot_build_date=202308161711 qnap_model=ts642"
+ CONFIG_SPL_FIT_IMAGE_KB=4096
