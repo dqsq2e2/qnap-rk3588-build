@@ -181,7 +181,7 @@ cleanup() {
         (( ${#remain_mounts[@]} > 0 )) && printf "挂载残留: %s\n" "${remain_mounts[@]}"
         (( ${#loop_devices[@]} > 0 )) && printf "设备未释放: %s\n" "${loop_devices[@]}"
         (( ${#remain_files[@]} > 0 )) && printf "目录残留: %s\n" "${remain_files[@]}"
-    } | awk '{print "'${RED}'✗ " $0 "'${NC}'"}' >&2
+    } | awk '{print "'${RED}'✗ " $0 "'${NC}'"}' >&2 || true
 
     # 最终状态验证
     if [[ -d "${TMP_DIR}" ]]; then
