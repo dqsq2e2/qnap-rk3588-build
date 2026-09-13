@@ -70,10 +70,12 @@ g98_rename_nics()
 	# 4) DSA master 必须保持 UP
 	ifconfig dsa0 up 2>/dev/null
 	ifconfig dsa1 up 2>/dev/null
-	# 5) YT921x tag 使 stmmac 硬件 RX 校验和按错误偏移解析（DHCP OFFER 被判
-	#    bad checksum 丢弃），关闭 master 口 RX 校验和卸载
-	ethtool -K dsa0 rx off 2>/dev/null
-	ethtool -K dsa1 rx off 2>/dev/null
+	# 5) YT921x tag 插在帧中间会错位 stmmac 全部硬件卸载：RX 校验和误判
+	#    （DHCP OFFER bad checksum 被丢）、TX 校验和/TSO 按错偏移填充
+	#    （上传大文件损坏）、GRO 按错偏移聚合（可能串流）。master 口全部关掉
+	for m in dsa0 dsa1; do
+		ethtool -K $m rx off tx off tso off gro off 2>/dev/null
+	done
 	echo G98MARK:rename-done > /dev/kmsg
 }
 
