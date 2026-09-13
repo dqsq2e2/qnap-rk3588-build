@@ -1,14 +1,68 @@
 #!/bin/sh
+
+# G98 网口命名规整（须在 QTS/hal 扫描网口之前执行）：
+#   RTL8125 2.5G x2 (r8169)  -> eth0/eth1（按 PCI 地址：0002:21 在前、0003:31 在后）
+#   YT9215 DSA 用户口 lan1-8 -> eth2..eth9
+#   gmac CPU 口              -> dsa0/dsa1 并保持 UP
+#     （QTS 只认 eth* 命名会自动忽略 CPU 口；但 DSA master 必须 UP 用户口才能通）
+g98_rename_nics()
+{
+	command -v ip >/dev/null 2>&1 || return 0
+	local ifc path target i
+	# 1) gmac CPU 口改名让位（fe1b0000=gmac0 -> dsa0，fe1c0000=gmac1 -> dsa1）
+	for ifc in $(ls /sys/class/net/ 2>/dev/null); do
+		path=$(readlink /sys/class/net/$ifc/device 2>/dev/null)
+		case "$path" in
+		*fe1b0000.ethernet*) target=dsa0 ;;
+		*fe1c0000.ethernet*) target=dsa1 ;;
+		*) continue ;;
+		esac
+		if [ "$ifc" != "$target" ]; then
+			ifconfig $ifc down 2>/dev/null
+			ip link set dev $ifc name $target 2>/dev/null
+			echo G98MARK:rename-$ifc-to-$target > /dev/kmsg
+		fi
+		ifconfig $target up 2>/dev/null
+	done
+	# 2) RTL8125 -> eth0/eth1
+	for ifc in $(ls /sys/class/net/ 2>/dev/null); do
+		path=$(readlink /sys/class/net/$ifc/device 2>/dev/null)
+		case "$path" in
+		*0002:21:00.0*) target=eth0 ;;
+		*0003:31:00.0*) target=eth1 ;;
+		*) continue ;;
+		esac
+		if [ "$ifc" != "$target" ]; then
+			ifconfig $ifc down 2>/dev/null
+			ip link set dev $ifc name $target 2>/dev/null
+			echo G98MARK:rename-$ifc-to-$target > /dev/kmsg
+		fi
+	done
+	# 3) DSA 用户口 lan1-8 -> eth2-eth9
+	i=1
+	while [ $i -le 8 ]; do
+		if [ -d /sys/class/net/lan$i ] && [ ! -d /sys/class/net/eth$((i+1)) ]; then
+			ifconfig lan$i down 2>/dev/null
+			ip link set dev lan$i name eth$((i+1)) 2>/dev/null
+			echo G98MARK:rename-lan$i-to-eth$((i+1)) > /dev/kmsg
+		fi
+		i=$((i+1))
+	done
+	# 4) DSA master 必须保持 UP
+	ifconfig dsa0 up 2>/dev/null
+	ifconfig dsa1 up 2>/dev/null
+	echo G98MARK:rename-done > /dev/kmsg
+}
+
 patch_front()
 {
 	[ ! -f /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko 2>>/dev/null
-	# YT921x DSA �����������ף��Ա��룻˳�� core��tag��switch��tag �������� switch ע�ᣩ
-	[ ! -f /lib/modules/5.10.60-qnap/dsa_core.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/dsa_core.ko 2>>/dev/null
-	[ ! -f /lib/modules/5.10.60-qnap/tag_yt921x.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/tag_yt921x.ko 2>>/dev/null
-	[ ! -f /lib/modules/5.10.60-qnap/yt921x.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/yt921x.ko 2>>/dev/null
+	# YT921x DSA 三件套已内置化（CONFIG_NET_DSA/NET_DSA_YT921X/NET_DSA_TAG_YT921X=y），
+	# 内核启动即 probe，无需在此 insmod
+	g98_rename_nics
 	sed "/i915.ko/i \[ ! -f /lib/modules/misc/gpu-sched.ko \] || /sbin/insmod /lib/modules/misc/gpu-sched.ko" /etc/init.d/init_check.sh -i
 	sed "/i915.ko/i \[ ! -f /lib/modules/misc/panfrost.ko \] || /sbin/insmod /lib/modules/misc/panfrost.ko" /etc/init.d/init_check.sh -i
-	sed "/hal_netlink.ko/i if \[ x\$(fw_printenv -n qnap_kernel) != x\"qnap\" \] && [ \$(fw_printenv -n qnap_kernel_version) -lt 521 ]; then cp -f /lib/modules/misc/hal_netlink.bak /lib/modules/misc/hal_netlink.ko ; fi" /etc/init.d/init_check.sh -i
+	sed "/hal_netlink.ko/i if \[ x$(fw_printenv -n qnap_kernel) != x"qnap" \] && [ $(fw_printenv -n qnap_kernel_version) -lt 521 ]; then cp -f /lib/modules/misc/hal_netlink.bak /lib/modules/misc/hal_netlink.ko ; fi" /etc/init.d/init_check.sh -i
 	#echo schedutil | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 	if [ x$(fw_printenv -n qnap_kernel) = x"qnap" ]; then /sbin/insmod /lib/modules/misc/pwm-fan.ko; sed '/^SIO_HWMON_INDEX[[:space:]]*=/c\SIO_HWMON_INDEX = 7'  -i  /etc/model.conf; fi 2>>/dev/null
 	#fix model MEMORY_SIZE_M
@@ -28,11 +82,11 @@ patch_back()
 while getopts ":fb" opt; do
   case $opt in
     f)
-	  #��ʼ��bootǰ
+	  #初始化boot前
       patch_front
       ;;
     b)
-      #boot�����
+      #boot后加载
 	  patch_back
       ;;  
     \?)
