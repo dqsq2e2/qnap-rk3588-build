@@ -442,7 +442,7 @@
 	rockchip,perst-inactive-ms = <500>;
 	pinctrl-0 = <&pcie2_0_rst>;
 	supports-clkreq;
-	reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 	vpcie3v3-supply = <&vcc3v3_nvme>;
 	status = "okay";
 
@@ -532,7 +532,7 @@
 
 	pcie {
 		pcie2_0_rst: pcie2-0-rst {
-			rockchip,pins = <4 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
 		pcie2_1_rst: pcie2-1-rst {
@@ -756,9 +756,10 @@
 /*
  * 串口控制台由 fiq-debugger(ttyFIQ0) 占用 uart2。
  * uart7 本板未使用，保持 disabled。
- * （注：早期 6.6 dts 注释称 uart7m2 与 pcie2x1l0 PERST# 冲突，那是
- *  PERST# 被误记为 GPIO1_PB4 时的结论；实际 PERST# 是 GPIO4_PB4，
- *  与 uart7m2 的 GPIO1_PB4/PB5 并无冲突。）
+ * （注：uart7m2 的 TX/RX 是 GPIO1_PB4/PB5，与 pcie2x1l0 PERST#
+ *  GPIO1_PB4 硬件冲突——原厂反编译 dtb 与 6.6 实测 dts 均确认
+ *  PERST# 为 GPIO1_PB4，uart7 必须 disabled。早期曾误判 PERST#
+ *  为 GPIO4_PB4（致 fe170000 链路训练偶发失败），已订正。）
  */
 &uart7 {
 	status = "disabled";
