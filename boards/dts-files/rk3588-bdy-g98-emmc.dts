@@ -627,6 +627,14 @@
 	snps,reset-delays-us = <0x00 0x4e20 0x186a0>;
 	snps,reset-gpio = <&gpio3 RK_PD0 GPIO_ACTIVE_LOW>;
 	status = "okay";
+
+	/* 5.10 stmmac 无 phy-handle/fixed-link 时 stmmac_open 失败(-ENODEV)，
+	 * DSA conduit 无法 up；恢复 fixed-link（与交换机 cpu 口侧不冲突） */
+	fixed-link {
+		speed = <1000>;
+		full-duplex;
+		pause;
+	};
 };
 
 &gmac1 {
@@ -639,6 +647,12 @@
 	snps,reset-delays-us = <0x00 0x4e20 0x186a0>;
 	snps,reset-gpio = <&gpio4 RK_PB3 GPIO_ACTIVE_LOW>;
 	status = "okay";
+
+	fixed-link {
+		speed = <1000>;
+		full-duplex;
+		pause;
+	};
 };
 
 &mdio0 {
