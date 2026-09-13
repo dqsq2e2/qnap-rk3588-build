@@ -2,6 +2,10 @@
 patch_front()
 {
 	[ ! -f /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko 2>>/dev/null
+	# YT921x DSA 交换机三件套（自编译；顺序 core→tag→switch，tag 必须先于 switch 注册）
+	[ ! -f /lib/modules/5.10.60-qnap/dsa_core.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/dsa_core.ko 2>>/dev/null
+	[ ! -f /lib/modules/5.10.60-qnap/tag_yt921x.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/tag_yt921x.ko 2>>/dev/null
+	[ ! -f /lib/modules/5.10.60-qnap/yt921x.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/yt921x.ko 2>>/dev/null
 	sed "/i915.ko/i \[ ! -f /lib/modules/misc/gpu-sched.ko \] || /sbin/insmod /lib/modules/misc/gpu-sched.ko" /etc/init.d/init_check.sh -i
 	sed "/i915.ko/i \[ ! -f /lib/modules/misc/panfrost.ko \] || /sbin/insmod /lib/modules/misc/panfrost.ko" /etc/init.d/init_check.sh -i
 	sed "/hal_netlink.ko/i if \[ x\$(fw_printenv -n qnap_kernel) != x\"qnap\" \] && [ \$(fw_printenv -n qnap_kernel_version) -lt 521 ]; then cp -f /lib/modules/misc/hal_netlink.bak /lib/modules/misc/hal_netlink.ko ; fi" /etc/init.d/init_check.sh -i
