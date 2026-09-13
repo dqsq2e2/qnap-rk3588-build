@@ -1,0 +1,100 @@
+--- a/drivers/pci/controller/dwc/pcie-dw-rockchip.c
++++ b/drivers/pci/controller/dwc/pcie-dw-rockchip.c
+@@ -742,7 +742,7 @@
+ 
+ static int rk_pcie_establish_link(struct dw_pcie *pci)
+ {
+-	int retries, power;
++	int retries, power, attempt;
+ 	struct rk_pcie *rk_pcie = to_rk_pcie(pci);
+ 	bool std_rc = rk_pcie->mode == RK_PCIE_RC_TYPE && !rk_pcie->dma_obj;
+ 
+@@ -789,43 +789,57 @@
+ 	 * requuirement here. We add a 200ms by default for sake of hoping everthings
+ 	 * work fine. If it doesn't, please add more in DT node by add rockchip,perst-inactive-ms.
+ 	 */
+-	msleep(rk_pcie->perst_inactive_ms);
+-	gpiod_set_value_cansleep(rk_pcie->rst_gpio, 1);
+-
+-	/* Enable LTSSM */
+-	rk_pcie_enable_ltssm(rk_pcie);
+-
+ 	/*
+-	 * Add this 1ms delay because we observe link is always up stably after it and
+-	 * could help us save 20ms for scanning devices.
++	 * G98: 链路训练对 PERST 时序敏感（RTL8125/NVMe 偶发 LTSSM 卡
++	 * 0x0/0x2 导致 Link Fail），失败时重新翻转 PERST 重试，最多 3 轮。
+ 	 */
+-	usleep_range(1000, 1100);
++	for (attempt = 0; attempt < 3; attempt++) {
++		if (attempt) {
++			dev_info(pci->dev, "PCIe link retry #%d (PERST re-toggle)\n",
++				 attempt);
++			gpiod_set_value_cansleep(rk_pcie->rst_gpio, 0);
++			rk_pcie_disable_ltssm(rk_pcie);
++			msleep(100);
++		}
+ 
+-	/*
+-	 * Add 500ms delay here for Jira#HWRTSA42-129.
+-	 */
+-	msleep(500);
++		msleep(rk_pcie->perst_inactive_ms);
++		gpiod_set_value_cansleep(rk_pcie->rst_gpio, 1);
+ 
+-	for (retries = 0; retries < 100; retries++) {
+-		if (dw_pcie_link_up(pci)) {
+-			/*
+-			 * We may be here in case of L0 in Gen1. But if EP is capable
+-			 * of Gen2 or Gen3, Gen switch may happen just in this time, but
+-			 * we keep on accessing devices in unstable link status. Given
+-			 * that LTSSM max timeout is 24ms per period, we can wait a bit
+-			 * more for Gen switch.
+-			 */
+-			msleep(50);
+-			dev_info(pci->dev, "PCIe Link up, LTSSM is 0x%x\n",
+-				 rk_pcie_readl_apb(rk_pcie, PCIE_CLIENT_LTSSM_STATUS));
++		/* Enable LTSSM */
++		rk_pcie_enable_ltssm(rk_pcie);
++
++		/*
++		 * Add this 1ms delay because we observe link is always up stably after it and
++		 * could help us save 20ms for scanning devices.
++		 */
++		usleep_range(1000, 1100);
++
++		/*
++		 * Add 500ms delay here for Jira#HWRTSA42-129.
++		 */
++		msleep(500);
++
++		for (retries = 0; retries < 100; retries++) {
++			if (dw_pcie_link_up(pci)) {
++				/*
++				 * We may be here in case of L0 in Gen1. But if EP is capable
++				 * of Gen2 or Gen3, Gen switch may happen just in this time, but
++				 * we keep on accessing devices in unstable link status. Given
++				 * that LTSSM max timeout is 24ms per period, we can wait a bit
++				 * more for Gen switch.
++				 */
++				msleep(50);
++				dev_info(pci->dev, "PCIe Link up, LTSSM is 0x%x\n",
++					 rk_pcie_readl_apb(rk_pcie, PCIE_CLIENT_LTSSM_STATUS));
++				rk_pcie_debug_dump(rk_pcie);
++				return 0;
++			}
++
++			dev_info_ratelimited(pci->dev, "PCIe Linking... LTSSM is 0x%x\n",
++					     rk_pcie_readl_apb(rk_pcie, PCIE_CLIENT_LTSSM_STATUS));
+ 			rk_pcie_debug_dump(rk_pcie);
+-			return 0;
++			msleep(20);
+ 		}
+-
+-		dev_info_ratelimited(pci->dev, "PCIe Linking... LTSSM is 0x%x\n",
+-				     rk_pcie_readl_apb(rk_pcie, PCIE_CLIENT_LTSSM_STATUS));
+-		rk_pcie_debug_dump(rk_pcie);
+-		msleep(20);
+ 	}
+ 
+ 	dev_err(pci->dev, "PCIe Link Fail\n");

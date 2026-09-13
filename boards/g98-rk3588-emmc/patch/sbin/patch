@@ -5,6 +5,25 @@
 #   YT9215 DSA 用户口 lan1-8 -> eth2..eth9
 #   gmac CPU 口              -> dsa0/dsa1 并保持 UP
 #     （QTS 只认 eth* 命名会自动忽略 CPU 口；但 DSA master 必须 UP 用户口才能通）
+
+# 库存预编译无线/网卡模块与自编译内核 ABI 不兼容：一旦被 modprobe/insmod 加载
+# 即在 register_netdevice_notifier 路径 oops，死进程持 RTNL 锁 → 全局网络死锁
+# （sshd 卡 banner、ip addr 挂 D 态、网络与虚拟交换机服务全灭、qpkg 启动超时）。
+# 改名 .disabled 无效：QTS 启动时 depmod 会把 .ko.disabled 重新索引为可加载模块，
+# 必须每次启动彻底删除并重建 dep 索引。
+g98_purge_stock_modules()
+{
+	local m
+	for m in cfg80211.ko mac80211.ko ath.ko ath9k.ko ath9k_common.ko ath9k_hw.ko ath9k_htc.ko ath10k_core.ko ath10k_pci.ko ath10k_snoc.ko iwlwifi.ko iwlmvm.ko iwldvm.ko mt76.ko mt76-usb.ko mt7601u.ko mt76x0-common.ko mt76x02-lib.ko mt76x02-usb.ko mt76x0u.ko r8125.ko; do
+		rm -f /lib/modules/5.10.60-qnap/$m /lib/modules/5.10.60-qnap/$m.disabled /usr/local/modules/$m /usr/local/modules/$m.disabled 2>/dev/null
+	done
+	rm -f /lib/modules/5.10.60-qnap/wifi/*.ko 2>/dev/null
+	# 清掉 dep 文本索引里指向已删模块（含 .disabled）的条目，再重建
+	sed -i '/\.ko\.disabled/d' /lib/modules/5.10.60-qnap/modules.dep /lib/modules/5.10.60-qnap/modules.alias /lib/modules/5.10.60-qnap/modules.symbols 2>/dev/null
+	command -v depmod >/dev/null 2>&1 && depmod -a 2>/dev/null
+	echo G98MARK:purge-stock-modules-done > /dev/kmsg
+}
+
 g98_rename_nics()
 {
 	command -v ip >/dev/null 2>&1 || return 0
@@ -57,6 +76,7 @@ g98_rename_nics()
 patch_front()
 {
 	[ ! -f /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko ] || /sbin/insmod /lib/modules/5.10.60-qnap/ledtrig-heartbeat.ko 2>>/dev/null
+	g98_purge_stock_modules
 	# YT921x DSA 三件套已内置化（CONFIG_NET_DSA/NET_DSA_YT921X/NET_DSA_TAG_YT921X=y），
 	# 内核启动即 probe，无需在此 insmod
 	g98_rename_nics
