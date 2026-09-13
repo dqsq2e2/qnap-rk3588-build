@@ -67,6 +67,23 @@ g98_rename_nics()
 		fi
 		i=$((i+1))
 	done
+	# 3.5) 确定性 MAC：r8169/gmac 的 EEPROM MAC 为空，每 boot 随机导致 IP 乱变。
+	#     用 eMMC CID 派生本机固定 MAC（本地管理地址，每板唯一）
+	if [ -f /sys/block/mmcblk0/device/cid ]; then
+		h=$(md5sum /sys/block/mmcblk0/device/cid | cut -c1-10)
+		b1=$(echo $h | cut -c1-2); b2=$(echo $h | cut -c3-4)
+		b3=$(echo $h | cut -c5-6); b4=$(echo $h | cut -c7-8); b5=$(echo $h | cut -c9-10)
+		i=0
+		for n in eth0 eth1 eth2 eth3 eth4 eth5 eth6 eth7 eth8 eth9 dsa0 dsa1; do
+			if [ -d /sys/class/net/$n ]; then
+				hex=$(printf '%02x' $((16#$b5 + i)))
+				ifconfig $n down 2>/dev/null
+				ip link set dev $n address 02:$b1:$b2:$b3:$b4:$hex 2>/dev/null
+				echo G98MARK:mac-$n-02:$b1:$b2:$b3:$b4:$hex > /dev/kmsg
+			fi
+			i=$((i+1))
+		done
+	fi
 	# 4) DSA master 必须保持 UP
 	ifconfig dsa0 up 2>/dev/null
 	ifconfig dsa1 up 2>/dev/null
