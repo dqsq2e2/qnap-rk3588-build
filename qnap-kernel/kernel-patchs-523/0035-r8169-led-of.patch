@@ -16,22 +16,31 @@
  	TxDescStartAddrLow	= 0x20,
  	TxDescStartAddrHigh	= 0x24,
  	TxHDescStartAddrLow	= 0x28,
-@@ -5315,6 +5317,22 @@
+@@ -5315,6 +5317,31 @@
  	rtl_rar_set(tp, mac_addr);
  }
  
++
 +static int rtl_led_configuration(struct rtl8169_private *tp)
 +{
 +	u32 led_data;
 +	int ret;
 +
++	if (!tp->pci_dev->dev.of_node) {
++		dev_info(&tp->pci_dev->dev, "r8169: no OF node, skip LED config\n");
++		return -EINVAL;
++	}
++
 +	ret = of_property_read_u32(tp->pci_dev->dev.of_node,
 +				   "realtek,led-data", &led_data);
 +
-+	if (ret)
++	if (ret) {
++		dev_info(&tp->pci_dev->dev, "r8169: no realtek,led-data (%d)\n", ret);
 +		return ret;
++	}
 +
 +	RTL_W16(tp, CustomLED, led_data);
++	dev_info(&tp->pci_dev->dev, "r8169: CustomLED set to 0x%x\n", led_data);
 +
 +	return 0;
 +}
@@ -39,7 +48,7 @@
  static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
  {
  	struct rtl8169_private *tp;
-@@ -5473,6 +5491,7 @@
+@@ -5473,6 +5500,7 @@
  	if (!tp->counters)
  		return -ENOMEM;
  
