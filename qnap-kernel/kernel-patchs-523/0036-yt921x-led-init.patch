@@ -1,0 +1,91 @@
+--- a/drivers/net/dsa/yt921x.c
++++ b/drivers/net/dsa/yt921x.c
+@@ -2381,6 +2381,79 @@
+ 	return 0;
+ }
+ 
++/* G98: 交换机口 LED 初始化（移植自 lurenjia BSP 驱动 yt9215_core.c）。
++ * 芯片默认配置下灯只亮不闪；改串行模式并使能链路/活动闪烁。
++ * 调用方须已持 priv->reg_lock。
++ */
++#define YT921X_LED_GLB_CTRL		0xd0000
++#define YT921X_LED_CTRL_0_BASE		0xd0004	/* LED0 action, per MAC, stride 4 */
++#define YT921X_LED_SERIAL_CTRL		0xd0100
++
++#define YT921X_LED_GLB_MODE_SERIAL	0x2		/* [1:0] LED mode = serial */
++#define YT921X_LED_GLB_SERIAL_PORTS_7	(7 << 13)	/* [16:13] serial port count */
++#define YT921X_LED_GLB_ENABLE		BIT(21)		/* global LED enable */
++
++#define YT921X_LED_SERIAL_ACTIVE_LOW	BIT(4)		/* active low */
++#define YT921X_LED_SERIAL_PIN_NUM_3	0x2		/* [1:0] 3 LED pins */
++#define YT921X_LED_SERIAL_ENABLE_MASK	(0x3U << 24)	/* [25:24] serial enable */
++
++#define YT921X_LED0_ACTION_VALUE	(BIT(4) | BIT(5) | BIT(6) | \
++					 BIT(9) | BIT(10) | BIT(17))
++
++static int yt921x_led_init(struct yt921x_priv *priv)
++{
++	u32 val;
++	int i, res;
++
++	/* 1. LED mode = serial; serial port count = 7 */
++	res = yt921x_reg_read(priv, YT921X_LED_GLB_CTRL, &val);
++	if (res)
++		return res;
++	val &= ~0x3;
++	val |= YT921X_LED_GLB_MODE_SERIAL | YT921X_LED_GLB_SERIAL_PORTS_7;
++	res = yt921x_reg_write(priv, YT921X_LED_GLB_CTRL, val);
++	if (res)
++		return res;
++
++	/* 2. active low; 3 LED pins */
++	res = yt921x_reg_read(priv, YT921X_LED_SERIAL_CTRL, &val);
++	if (res)
++		return res;
++	val |= YT921X_LED_SERIAL_ACTIVE_LOW | YT921X_LED_SERIAL_PIN_NUM_3;
++	res = yt921x_reg_write(priv, YT921X_LED_SERIAL_CTRL, val);
++	if (res)
++		return res;
++
++	/* 3. per-MAC LED0 action: link 10/100/1000M on, RX/TX blink */
++	for (i = 0; i < 10; i++) {
++		res = yt921x_reg_write(priv, YT921X_LED_CTRL_0_BASE + i * 4,
++				       YT921X_LED0_ACTION_VALUE);
++		if (res)
++			return res;
++	}
++
++	/* 4. serial enable + global enable */
++	res = yt921x_reg_read(priv, YT921X_LED_SERIAL_CTRL, &val);
++	if (res)
++		return res;
++	val |= YT921X_LED_SERIAL_ENABLE_MASK;
++	res = yt921x_reg_write(priv, YT921X_LED_SERIAL_CTRL, val);
++	if (res)
++		return res;
++
++	res = yt921x_reg_read(priv, YT921X_LED_GLB_CTRL, &val);
++	if (res)
++		return res;
++	val |= YT921X_LED_GLB_ENABLE;
++	res = yt921x_reg_write(priv, YT921X_LED_GLB_CTRL, val);
++	if (res)
++		return res;
++
++	dev_info(priv->ds.dev, "yt921x: LED init done (GLB_CTRL=0x%08x)\n", val);
++
++	return 0;
++}
++
+ static int yt921x_dsa_setup(struct dsa_switch *ds)
+ {
+ 	struct yt921x_priv *priv = to_yt921x_priv(ds);
+@@ -2408,6 +2481,8 @@
+ 			goto unlock;
+ 	}
+ 
++	res = yt921x_led_init(priv);
++
+ unlock:
+ 	mutex_unlock(&priv->reg_lock);
+ 

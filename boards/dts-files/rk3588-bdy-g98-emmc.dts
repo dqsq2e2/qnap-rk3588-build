@@ -464,6 +464,7 @@
 			r8125,led1 = <0x22b>;
 			r8125,led2 = <0x22b>;
 			r8125,led3 = <0x22b>;
+			realtek,led-data = <0x200>;
 		};
 	};
 };
@@ -490,6 +491,7 @@
 			r8125,led1 = <0x22b>;
 			r8125,led2 = <0x22b>;
 			r8125,led3 = <0x22b>;
+			realtek,led-data = <0x200>;
 		};
 	};
 };
