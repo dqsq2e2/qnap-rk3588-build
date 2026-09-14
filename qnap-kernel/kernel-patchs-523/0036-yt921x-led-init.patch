@@ -1,136 +1,75 @@
 --- a/drivers/net/dsa/yt921x.c
 +++ b/drivers/net/dsa/yt921x.c
-@@ -2381,6 +2381,137 @@
+@@ -2381,6 +2381,76 @@
  	return 0;
  }
  
 +
-+/* G98: switch port LED init (ported from lurenjia BSP yt9215_core.c).
-+ * Default chip config: LEDs on but never blink. Switch to serial LED
-+ * engine with link/activity blink. Caller must hold priv->reg_lock.
-+ * NOTE: serial mode REQUIRES the 21-slot remapping table, otherwise
-+ * the serial engine outputs an empty map and all LEDs go dark.
++/* bdy-g98 ties both RJ45 LEDs of each gigabit jack to one electrical
++ * net driven by the port's two parallel LED pins, so the two LEDs
++ * always show the same thing: a pin driving the net low wins over a
++ * released pin, and blink wins over solid.  The board profile is
++ * therefore a joint one: LED1 holds the net lit on link at any speed
++ * and blinks it on RX/TX activity, LED0 keeps the net low while the
++ * port is trying to link.  Net effect: both LEDs solid on link, both
++ * blink on traffic, both dark while unlinked.  YT921X_RST_HW reverts
++ * the LED controller, so apply this after reset.
++ * (ported from the 6.x driver's yt921x_led_profile_setup)
 + */
 +#define YT921X_LED_GLB_CTRL		0xd0000
-+#define YT921X_LED_CTRL_0_BASE		0xd0004	/* LED0 action, per MAC, stride 4 */
-+#define YT921X_LED_SERIAL_CTRL		0xd0100
-+#define YT921X_LED_SERIAL_REMAPPING_BASE 0xd0104
++#define YT921X_LED_CTRL_0(port)		(0xd0004 + 4 * (port))
++#define YT921X_LED_CTRL_1(port)		(0xd0040 + 4 * (port))
++#define  YT921X_LED_10M_ON		BIT(4)
++#define  YT921X_LED_100M_ON		BIT(5)
++#define  YT921X_LED_1000M_ON		BIT(6)
++#define  YT921X_LED_RXACT_BLINK		BIT(9)
++#define  YT921X_LED_TXACT_BLINK		BIT(10)
++#define  YT921X_LED_ACT_BLINK_IND	BIT(13)
++#define  YT921X_LED_DISABLE_LINK_TRY	BIT(17)	/* LED0 only */
 +
-+#define YT921X_LED_GLB_MODE_SERIAL	0x2		/* [1:0] LED mode = serial */
-+#define YT921X_LED_GLB_SERIAL_PORTS_7	(7 << 13)	/* [16:13] serial port count */
-+#define YT921X_LED_GLB_ENABLE		BIT(21)		/* global LED enable */
++#define YT921X_LED_PROFILE_LINK	(YT921X_LED_10M_ON | YT921X_LED_100M_ON | \
++				 YT921X_LED_1000M_ON | \
++				 YT921X_LED_DISABLE_LINK_TRY)
++#define YT921X_LED_PROFILE_ACT	(YT921X_LED_10M_ON | YT921X_LED_100M_ON | \
++				 YT921X_LED_1000M_ON | \
++				 YT921X_LED_RXACT_BLINK | \
++				 YT921X_LED_TXACT_BLINK | YT921X_LED_ACT_BLINK_IND)
 +
-+#define YT921X_LED_SERIAL_ACTIVE_LOW	BIT(4)		/* active low */
-+#define YT921X_LED_SERIAL_PIN_NUM_3	0x2		/* [1:0] 3 LED pins */
-+#define YT921X_LED_SERIAL_ENABLE_MASK	(0x3U << 24)	/* [25:24] serial enable */
-+
-+#define YT921X_LED0_ACTION_VALUE	(BIT(4) | BIT(5) | BIT(6) | \
-+					 BIT(9) | BIT(10) | BIT(17))
-+
-+static const struct {
-+	u8 serial_id;
-+	u8 led_id;
-+} yt921x_sled21_remap[21] = {
-+	{9, 0}, {8, 0}, {4, 0}, {3, 0}, {2, 0}, {1, 0}, {0, 0},
-+	{9, 1}, {8, 1}, {4, 1}, {3, 1}, {2, 1}, {1, 1}, {0, 1},
-+	{9, 2}, {8, 2}, {4, 2}, {3, 2}, {2, 2}, {1, 2}, {0, 2}
-+};
-+
-+static const struct {
-+	u8 port;
-+	u8 led_id;
-+} yt921x_led_remap[21] = {
-+	{6, 1}, {4, 0}, {5, 1}, {3, 0}, {2, 0}, {1, 0}, {0, 0},
-+	{6, 0}, {5, 0}, {4, 1}, {3, 1}, {2, 1}, {1, 1}, {0, 1},
-+	{6, 2}, {5, 2}, {4, 2}, {3, 2}, {2, 2}, {1, 2}, {0, 2}
-+};
-+
-+static u8 yt921x_led_port_to_mac(u8 port)
++/* Caller must hold priv->reg_lock */
++static int yt921x_led_profile_setup(struct yt921x_priv *priv)
 +{
-+	static const u8 mac[7] = { 0, 1, 2, 3, 4, 8, 9 };
++	struct dsa_switch *ds = &priv->ds;
++	u32 old0, old1;
++	int port, res;
 +
-+	return (port < 7) ? mac[port] : port;
-+}
++	if (!of_property_read_bool(priv->ds.dev->of_node,
++				   "motorcomm,bdy-g98-led-profile"))
++		return 0;
 +
-+static int yt921x_led_serial_remapping_set(struct yt921x_priv *priv, int index)
-+{
-+	u32 src_mac = yt921x_sled21_remap[index].serial_id;
-+	u8 slot_led = yt921x_sled21_remap[index].led_id;
-+	u32 reg = YT921X_LED_SERIAL_REMAPPING_BASE +
-+		  (2 - slot_led) * 8 + (src_mac / 5) * 4;
-+	u32 dst_mac = yt921x_led_port_to_mac(yt921x_led_remap[index].port);
-+	u32 dst_led = yt921x_led_remap[index].led_id;
-+	u32 shift = (src_mac % 5) * 6;
-+	u32 mask, val;
-+	int res;
++	for (port = 0; port < ds->num_ports; port++) {
++		if (!dsa_is_user_port(ds, port))
++			continue;
 +
-+	res = yt921x_reg_read(priv, reg, &val);
-+	if (res)
-+		return res;
-+	mask = (0xfU << (shift + 2)) | (0x3U << shift);
-+	val = (val & ~mask) |
-+	      ((dst_mac & 0xfU) << (shift + 2)) |
-+	      ((dst_led & 0x3U) << shift);
-+	return yt921x_reg_write(priv, reg, val);
-+}
-+
-+static int yt921x_led_init(struct yt921x_priv *priv)
-+{
-+	u32 val;
-+	int i, res;
-+
-+	/* 1. LED mode = serial; serial port count = 7 */
-+	res = yt921x_reg_read(priv, YT921X_LED_GLB_CTRL, &val);
-+	if (res)
-+		return res;
-+	val &= ~0x3;
-+	val |= YT921X_LED_GLB_MODE_SERIAL | YT921X_LED_GLB_SERIAL_PORTS_7;
-+	res = yt921x_reg_write(priv, YT921X_LED_GLB_CTRL, val);
-+	if (res)
-+		return res;
-+
-+	/* 2. active low; 3 LED pins */
-+	res = yt921x_reg_read(priv, YT921X_LED_SERIAL_CTRL, &val);
-+	if (res)
-+		return res;
-+	val |= YT921X_LED_SERIAL_ACTIVE_LOW | YT921X_LED_SERIAL_PIN_NUM_3;
-+	res = yt921x_reg_write(priv, YT921X_LED_SERIAL_CTRL, val);
-+	if (res)
-+		return res;
-+
-+	/* 3. serial LED remapping table (21 slots) */
-+	for (i = 0; i < 21; i++) {
-+		res = yt921x_led_serial_remapping_set(priv, i);
++		res = yt921x_reg_read(priv, YT921X_LED_CTRL_0(port), &old0);
 +		if (res)
 +			return res;
-+	}
-+
-+	/* 4. per-MAC LED0 action: link 10/100/1000M on, RX/TX blink */
-+	for (i = 0; i < 10; i++) {
-+		res = yt921x_reg_write(priv, YT921X_LED_CTRL_0_BASE + i * 4,
-+				       YT921X_LED0_ACTION_VALUE);
++		res = yt921x_reg_read(priv, YT921X_LED_CTRL_1(port), &old1);
 +		if (res)
 +			return res;
++		res = yt921x_reg_write(priv, YT921X_LED_CTRL_0(port),
++				       YT921X_LED_PROFILE_LINK);
++		if (res)
++			return res;
++		res = yt921x_reg_write(priv, YT921X_LED_CTRL_1(port),
++				       YT921X_LED_PROFILE_ACT);
++		if (res)
++			return res;
++
++		dev_info(priv->ds.dev,
++			 "port %d: LED0 0x%08x -> 0x%08x, LED1 0x%08x -> 0x%08x\n",
++			 port, old0, YT921X_LED_PROFILE_LINK, old1,
++			 YT921X_LED_PROFILE_ACT);
 +	}
-+
-+	/* 5. serial enable + global enable */
-+	res = yt921x_reg_read(priv, YT921X_LED_SERIAL_CTRL, &val);
-+	if (res)
-+		return res;
-+	val |= YT921X_LED_SERIAL_ENABLE_MASK;
-+	res = yt921x_reg_write(priv, YT921X_LED_SERIAL_CTRL, val);
-+	if (res)
-+		return res;
-+
-+	res = yt921x_reg_read(priv, YT921X_LED_GLB_CTRL, &val);
-+	if (res)
-+		return res;
-+	val |= YT921X_LED_GLB_ENABLE;
-+	res = yt921x_reg_write(priv, YT921X_LED_GLB_CTRL, val);
-+	if (res)
-+		return res;
-+
-+	dev_info(priv->ds.dev, "yt921x: LED init done (GLB_CTRL=0x%08x)\n", val);
 +
 +	return 0;
 +}
@@ -138,11 +77,11 @@
  static int yt921x_dsa_setup(struct dsa_switch *ds)
  {
  	struct yt921x_priv *priv = to_yt921x_priv(ds);
-@@ -2408,6 +2539,8 @@
+@@ -2408,6 +2478,8 @@
  			goto unlock;
  	}
  
-+	res = yt921x_led_init(priv);
++	res = yt921x_led_profile_setup(priv);
 +
  unlock:
  	mutex_unlock(&priv->reg_lock);

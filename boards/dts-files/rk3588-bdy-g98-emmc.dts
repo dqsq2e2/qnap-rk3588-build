@@ -464,7 +464,7 @@
 			r8125,led1 = <0x22b>;
 			r8125,led2 = <0x22b>;
 			r8125,led3 = <0x22b>;
-			realtek,led-data = <0x200>;
+			realtek,led-data = <0x22b>;
 		};
 	};
 };
@@ -491,7 +491,7 @@
 			r8125,led1 = <0x22b>;
 			r8125,led2 = <0x22b>;
 			r8125,led3 = <0x22b>;
-			realtek,led-data = <0x200>;
+			realtek,led-data = <0x22b>;
 		};
 	};
 };
@@ -666,6 +666,7 @@
 		compatible = "motorcomm,yt9215";
 		reg = <0x1d>;
 		dsa,member = <1 0>;
+		motorcomm,bdy-g98-led-profile;
 
 		ethernet-ports {
 			#address-cells = <1>;
@@ -712,6 +713,7 @@
 		compatible = "motorcomm,yt9215";
 		reg = <0x1d>;
 		dsa,member = <0 0>;
+		motorcomm,bdy-g98-led-profile;
 
 		ethernet-ports {
 			#address-cells = <1>;
