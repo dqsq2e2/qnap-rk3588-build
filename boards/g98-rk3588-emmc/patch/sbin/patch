@@ -18,10 +18,10 @@ g98_purge_stock_modules()
 		rm -f /lib/modules/5.10.60-qnap/$m /lib/modules/5.10.60-qnap/$m.disabled /usr/local/modules/$m /usr/local/modules/$m.disabled 2>/dev/null
 	done
 	rm -f /lib/modules/5.10.60-qnap/wifi/*.ko 2>/dev/null
+	rm -f /usr/local/modules/ipv6.ko 2>/dev/null
 	# 清掉 dep 文本索引里指向已删模块（含 .disabled）的条目，再重建
 	sed -i '/\.ko\.disabled/d' /lib/modules/5.10.60-qnap/modules.dep /lib/modules/5.10.60-qnap/modules.alias /lib/modules/5.10.60-qnap/modules.symbols 2>/dev/null
 	command -v depmod >/dev/null 2>&1 && depmod -a 2>/dev/null
-	echo G98MARK:purge-stock-modules-done > /dev/kmsg
 }
 
 g98_rename_nics()
@@ -39,7 +39,6 @@ g98_rename_nics()
 		if [ "$ifc" != "$target" ]; then
 			ifconfig $ifc down 2>/dev/null
 			ip link set dev $ifc name $target 2>/dev/null
-			echo G98MARK:rename-$ifc-to-$target > /dev/kmsg
 		fi
 		ifconfig $target up 2>/dev/null
 	done
@@ -54,7 +53,6 @@ g98_rename_nics()
 		if [ "$ifc" != "$target" ]; then
 			ifconfig $ifc down 2>/dev/null
 			ip link set dev $ifc name $target 2>/dev/null
-			echo G98MARK:rename-$ifc-to-$target > /dev/kmsg
 		fi
 	done
 	# 3) DSA 用户口 lan1-8 -> eth2-eth9
@@ -63,7 +61,6 @@ g98_rename_nics()
 		if [ -d /sys/class/net/lan$i ] && [ ! -d /sys/class/net/eth$((i+1)) ]; then
 			ifconfig lan$i down 2>/dev/null
 			ip link set dev lan$i name eth$((i+1)) 2>/dev/null
-			echo G98MARK:rename-lan$i-to-eth$((i+1)) > /dev/kmsg
 		fi
 		i=$((i+1))
 	done
@@ -79,7 +76,7 @@ g98_rename_nics()
 				hex=$(printf '%02x' $((16#$b5 + i)))
 				ifconfig $n down 2>/dev/null
 				ip link set dev $n address 02:$b1:$b2:$b3:$b4:$hex 2>/dev/null
-				echo G98MARK:mac-$n-02:$b1:$b2:$b3:$b4:$hex > /dev/kmsg
+				ifconfig $n up 2>/dev/null
 			fi
 			i=$((i+1))
 		done
@@ -93,7 +90,6 @@ g98_rename_nics()
 	for m in dsa0 dsa1; do
 		ethtool -K $m rx off tx off tso off gro off 2>/dev/null
 	done
-	echo G98MARK:rename-done > /dev/kmsg
 }
 
 patch_front()
